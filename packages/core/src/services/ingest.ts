@@ -25,6 +25,8 @@ export interface IngestResult {
   token: string;
   created: boolean;
   changed: boolean;
+  /** Stored but not yet picked up by a worker (e.g. the queue was down): enqueue it again. */
+  pending: boolean;
   bill: Bill;
   issues: ReturnType<typeof validateBill>;
 }
@@ -75,7 +77,7 @@ export async function ingestBill(db: Db, brandId: string, input: unknown, opts: 
 
   if (inserted[0]) {
     await db.insert(events).values({ brandId, billId: inserted[0].id, type: "bill.received", data: { source: opts.source } });
-    return { ...inserted[0], created: true, changed: true, bill, issues };
+    return { ...inserted[0], created: true, changed: true, pending: true, bill, issues };
   }
 
   const existing = await db.query.bills.findFirst({
@@ -88,7 +90,5 @@ export async function ingestBill(db: Db, brandId: string, input: unknown, opts: 
     await db.update(bills).set({ ...values, updatedAt: sql`now()` }).where(eq(bills.id, existing.id));
     await db.insert(events).values({ brandId, billId: existing.id, type: "bill.updated", data: { source: opts.source } });
   }
-  // A bill that was stored but never processed (e.g. the queue was down) is still "new".
-  if (existing.status === "received") return { id: existing.id, token: existing.token, created: true, changed: true, bill, issues };
-  return { id: existing.id, token: existing.token, created: false, changed, bill, issues };
+  return { id: existing.id, token: existing.token, created: false, changed, pending: existing.status === "received", bill, issues };
 }

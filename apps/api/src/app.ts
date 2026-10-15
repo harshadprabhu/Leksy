@@ -46,7 +46,7 @@ export async function buildApp(deps: Deps): Promise<FastifyInstance> {
     }
   });
 
-  await app.register(cors, { origin: [deps.cfg.WEB_ORIGIN], credentials: true });
+  await app.register(cors, { origin: [deps.cfg.WEB_ORIGIN], credentials: true, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"], maxAge: 600 });
   await app.register(cookie, { secret: deps.cfg.COOKIE_SECRET });
   await app.register(jwt, { secret: deps.cfg.JWT_SECRET, sign: { expiresIn: "12h" } });
   await app.register(rateLimit, { global: false, redis: deps.cfg.NODE_ENV === "test" ? undefined : deps.redis });

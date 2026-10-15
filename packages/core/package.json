@@ -6,8 +6,14 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./db": { "types": "./dist/db/index.d.ts", "default": "./dist/db/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./db": {
+      "types": "./dist/db/index.d.ts",
+      "default": "./dist/db/index.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -32,5 +38,9 @@
     "@types/pg": "^8.15.4",
     "@types/qrcode": "^1.5.5",
     "drizzle-kit": "^0.31.4"
-  }
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ]
 }

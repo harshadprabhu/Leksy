@@ -105,7 +105,8 @@ export async function deliverBill(d: WorkerDeps, job: DeliverJob) {
 export async function pullConnector(d: WorkerDeps, job: PullJob) {
   const out = await runPull(d.db, job.connectorId, d.allowPrivateUrls);
   for (const r of out.results) {
-    if (r.changed) await d.queues.process.add(r.created ? "bill.created" : "bill.updated", { billId: r.id, event: r.created ? "bill.created" : "bill.updated" });
+    if (r.pending) await d.queues.process.add("bill.created", { billId: r.id, event: "bill.created" }, { jobId: `${r.id}-c` });
+    else if (r.changed) await d.queues.process.add("bill.updated", { billId: r.id, event: "bill.updated" }, { jobId: `${r.id}-u-${Date.now()}` });
   }
   return { fetched: out.fetched, ingested: out.results.length, errors: out.errors.length };
 }

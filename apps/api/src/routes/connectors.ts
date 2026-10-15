@@ -104,7 +104,8 @@ export const connectorRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
     let sample = c.sample;
     if (c.kind === "pull" && c.pull) {
       try {
-        const list = await fetchFromBrand(c.pull, c.cursor, d.cfg.ALLOW_PRIVATE_URLS);
+        // Ignore the cursor: a sample should come back even when nothing is new.
+        const list = await fetchFromBrand(c.pull, null, d.cfg.ALLOW_PRIVATE_URLS);
         sample = list[0] ?? null;
         if (sample) await d.db.update(connectors).set({ sample }).where(eq(connectors.id, c.id));
       } catch (e) {

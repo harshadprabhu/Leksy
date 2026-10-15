@@ -27,7 +27,7 @@ const luxe: TemplateInput = {
       props: {
         source: "items",
         title: "{{name}}",
-        subtitle: "{{jewellery.purity}} {{jewellery.metal}} · HSN {{hsn}}",
+        subtitle: "{{jewellery.purity}} {{jewellery.metal}}{{hsn | prefix:' · HSN '}}",
         price: "{{amount | inr}}",
         showImage: true,
         details: [

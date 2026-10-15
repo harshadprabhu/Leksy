@@ -1,0 +1,70 @@
+# Production layout (EKS, ap-south-1). Managed PostgreSQL (RDS/Aurora) and
+# Redis (ElastiCache) are referenced through the `leksy-env` secret.
+# Each service scales on its own; the worker scales on queue depth.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: leksy-api, labels: { app: leksy-api } }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: leksy-api } }
+  template:
+    metadata: { labels: { app: leksy-api } }
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/leksy/api:latest
+          ports: [{ containerPort: 4000 }]
+          envFrom: [{ secretRef: { name: leksy-env } }]
+          readinessProbe: { httpGet: { path: /health, port: 4000 }, periodSeconds: 5 }
+          livenessProbe: { httpGet: { path: /health, port: 4000 }, periodSeconds: 15 }
+          resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { memory: 1Gi } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: leksy-api }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: leksy-api }
+  minReplicas: 3
+  maxReplicas: 30
+  metrics: [{ type: Resource, resource: { name: cpu, target: { type: Utilization, averageUtilization: 65 } } }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: leksy-worker, labels: { app: leksy-worker } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: leksy-worker } }
+  template:
+    metadata: { labels: { app: leksy-worker } }
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/leksy/worker:latest
+          envFrom: [{ secretRef: { name: leksy-env } }]
+          env: [{ name: WORKER_CONCURRENCY, value: "20" }]
+          resources: { requests: { cpu: 250m, memory: 256Mi }, limits: { memory: 512Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: leksy-web, labels: { app: leksy-web } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: leksy-web } }
+  template:
+    metadata: { labels: { app: leksy-web } }
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/leksy/web:latest
+          ports: [{ containerPort: 3000 }]
+          resources: { requests: { cpu: 100m, memory: 256Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: leksy-api }
+spec: { selector: { app: leksy-api }, ports: [{ port: 80, targetPort: 4000 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: leksy-web }
+spec: { selector: { app: leksy-web }, ports: [{ port: 80, targetPort: 3000 }] }

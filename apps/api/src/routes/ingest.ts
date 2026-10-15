@@ -7,13 +7,16 @@ import { anyAuth, apiKeyAuth, brandOf } from "../auth.js";
 
 export const ingestRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   const enqueue = async (r: IngestResult) => {
-    if (r.changed) await d.queues.process.add(r.created ? "bill.created" : "bill.updated", { billId: r.id, event: r.created ? "bill.created" : "bill.updated" }, { jobId: `${r.id}-${r.created ? "c" : Date.now()}` });
+    // Never-processed bills (including retries of one whose first enqueue failed) go out as
+    // "created"; the fixed job id makes repeats a no-op.
+    if (r.pending) await d.queues.process.add("bill.created", { billId: r.id, event: "bill.created" }, { jobId: `${r.id}-c` });
+    else if (r.changed) await d.queues.process.add("bill.updated", { billId: r.id, event: "bill.updated" }, { jobId: `${r.id}-u-${Date.now()}` });
   };
   const view = (r: IngestResult) => ({
     id: r.id,
     created: r.created,
     changed: r.changed,
-    status: r.changed ? "queued" : "unchanged",
+    status: r.changed || r.pending ? "queued" : "unchanged",
     url: billLinks(d.cfg.PUBLIC_BASE_URL, r.token).page,
     issues: r.issues,
   });
