@@ -92,6 +92,9 @@ export const FORMATTERS: Record<string, (v: unknown, arg?: string) => unknown> =
   lower: (v) => (v == null ? "" : String(v).toLowerCase()),
   title: (v) => (v == null ? "" : String(v).toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())),
   default: (v, arg) => (v == null || v === "" ? (arg ?? "") : v),
+  /** Add text before/after a value only when the value is present. */
+  prefix: (v, arg) => (v == null || v === "" ? "" : `${arg ?? ""}${v}`),
+  suffix: (v, arg) => (v == null || v === "" ? "" : `${v}${arg ?? ""}`),
   count: (v) => (Array.isArray(v) ? v.length : 0),
   sum: (v, arg) => (Array.isArray(v) ? v.reduce((s: number, el) => s + (toNumber(arg ? getPath(el, arg) : el) ?? 0), 0) : 0),
   join: (v, arg) => (Array.isArray(v) ? v.join(arg ?? ", ") : v),
@@ -138,6 +141,12 @@ function stringify(v: unknown): string {
 /** Replace every {{ ... }} in a string with its value (plain text, not escaped). */
 export function interpolate(template: string, ctx: Ctx): string {
   return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, e: string) => stringify(evaluate(e, ctx)));
+}
+
+/** True when a template string has bindings and every one of them is empty. */
+export function allBindingsEmpty(template: string, ctx: Ctx): boolean {
+  const exprs = [...template.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)].map((m) => m[1]!);
+  return exprs.length > 0 && exprs.every((e) => stringify(evaluate(e.split("|")[0]!, ctx)) === "");
 }
 
 /** Paths a template references; used to warn when a binding has no data. */

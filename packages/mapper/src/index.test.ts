@@ -69,6 +69,13 @@ describe("mapper", () => {
     expect(m.items).toMatchObject({ each: { from: "Lines", fields: { name: "ItemName", "jewellery.huid": "HUID" } } });
   });
 
+  it("builds tax lines from separate columns and parses day-first dates", () => {
+    const m = suggestMapping({ ...erp, CGST: "1500", SGST: "1500", SGSTRate: "1.5" });
+    const out = applyMapping(m, { ...erp, CGST: "1500", SGST: "1500", SGSTRate: "1.5" });
+    expect(out.issued_at).toBe("2026-10-15T18:05:00+05:30");
+    expect(out.taxes).toEqual([{ type: "CGST", amount: 1500 }, { type: "SGST", amount: 1500, rate: 1.5 }]);
+  });
+
   it("lists sample paths", () => {
     expect(samplePaths(erp)).toContain("Lines[0].ItemName");
   });

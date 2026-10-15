@@ -60,7 +60,7 @@ const luxe: TemplateInput = {
     { id: "survey", type: "survey", props: { title: "How was your visit, {{customer.name | default:'friend'}}?" }, style: { marginTop: 16 } },
     { id: "dl", type: "download_buttons", props: { formats: ["pdf"] } },
     { id: "qr", type: "qr", props: { value: "{{links.verify}}", size: 96, caption: "Scan to verify this bill" }, style: { align: "center", marginTop: 12 } },
-    { id: "foot", type: "text", props: { text: "{{store.address}}, {{store.city}}\nGSTIN {{store.gstin}} · {{store.phone}}" }, style: { align: "center", fontSize: 11, color: "#8a7a66", marginTop: 12 } },
+    { id: "foot", type: "text", props: { text: "{{store.address}}{{store.city | prefix:', '}}\n{{store.gstin | prefix:'GSTIN '}}\n{{store.phone}}" }, style: { align: "center", fontSize: 11, color: "#8a7a66", marginTop: 12 } },
   ],
 };
 

@@ -29,6 +29,8 @@ export type Rule =
       transform?: Transform[];
       default?: unknown;
       each?: { from: string; fields: Mapping };
+      /** Build an array from fixed entries, e.g. taxes from separate CGST/SGST columns. Entries whose `required` field is empty are dropped. */
+      list?: { entries: Mapping[]; required?: string };
     };
 export type Mapping = { [target: string]: Rule };
 
@@ -42,6 +44,7 @@ export const RuleSchema: z.ZodType<Rule> = z.lazy(() =>
       transform: z.array(TransformSchema).max(10).optional(),
       default: z.unknown().optional(),
       each: z.object({ from: z.string().max(300), fields: MappingSchema }).optional(),
+      list: z.object({ entries: z.array(MappingSchema).max(20), required: z.string().max(100).optional() }).optional(),
     }),
   ]),
 ) as z.ZodType<Rule>;
@@ -87,12 +90,17 @@ export function parseDate(value: unknown, pattern = "auto", offset = "+05:30"): 
     if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(s)) return `${s.replace(" ", "T")}${s.length === 16 ? ":00" : ""}${offset}`;
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s}T00:00:00${offset}`;
     if (/^\d{10,13}$/.test(s)) return parseDate(Number(s));
-    pattern = "DD/MM/YYYY HH:mm:ss";
+    // Indian ERPs mostly write day first.
+    for (const p of ["DD/MM/YYYY HH:mm:ss", "DD/MM/YYYY HH:mm", "DD/MM/YYYY", "DD-MM-YYYY HH:mm:ss", "DD-MM-YYYY HH:mm", "DD-MM-YYYY", "DD.MM.YYYY HH:mm", "DD.MM.YYYY"]) {
+      const out = parseDate(s, p, offset);
+      if (out) return out;
+    }
+    return undefined;
   }
   const tokens = pattern.match(/YYYY|MM|DD|HH|mm|ss/g) ?? [];
   const re = new RegExp("^" + pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/YYYY/, "(\\d{4})").replace(/MM/, "(\\d{1,2})").replace(/DD/, "(\\d{1,2})").replace(/HH/, "(\\d{1,2})").replace(/mm/, "(\\d{2})").replace(/ss/, "(\\d{2})"));
   const m = s.match(re);
-  if (!m) return undefined;
+  if (!m || m[0].length !== s.length) return undefined;
   const parts: Record<string, string> = { YYYY: "1970", MM: "01", DD: "01", HH: "00", mm: "00", ss: "00" };
   tokens.forEach((t, i) => (parts[t] = (m[i + 1] ?? parts[t]!).padStart(2, "0")));
   return `${parts.YYYY}-${parts.MM}-${parts.DD}T${parts.HH}:${parts.mm}:${parts.ss}${offset}`;
@@ -164,6 +172,9 @@ function evalRule(rule: Rule, source: unknown): unknown {
     const arr = getPath(source, rule.each.from);
     const list = Array.isArray(arr) ? arr : arr != null ? [arr] : [];
     return list.map((el) => applyMapping(rule.each!.fields, el, source));
+  }
+  if (rule.list) {
+    return rule.list.entries.map((m) => applyMapping(m, source)).filter((o) => !rule.list!.required || (getPath(o, rule.list!.required) !== undefined && getPath(o, rule.list!.required) !== ""));
   }
   let v: unknown = rule.value !== undefined ? rule.value : rule.template !== undefined ? interpolateSource(rule.template, source) : rule.from !== undefined ? getPath(source, rule.from) : undefined;
   for (const t of rule.transform ?? []) v = applyTransform(v, t, source);
@@ -249,6 +260,14 @@ export function suggestMapping(sample: Record<string, unknown>): Mapping {
     else if (["total", "round_off"].includes(target)) mapping[target] = { from: k, transform: [{ fn: "number" }] };
     else mapping[target] = k;
   }
+  const taxEntries: Mapping[] = [];
+  for (const t of ["CGST", "SGST", "IGST", "UTGST", "CESS", "VAT"]) {
+    const k = keys.find((x) => norm(x) === t.toLowerCase() || norm(x) === `${t.toLowerCase()}amount` || norm(x) === `${t.toLowerCase()}amt`);
+    if (!k) continue;
+    const rateKey = keys.find((x) => norm(x) === `${t.toLowerCase()}rate` || norm(x) === `${t.toLowerCase()}per` || norm(x) === `${t.toLowerCase()}percent`);
+    taxEntries.push({ type: { value: t }, amount: { from: k, transform: [{ fn: "number" }] }, ...(rateKey ? { rate: { from: rateKey, transform: [{ fn: "number" }] } } : {}) });
+  }
+  if (taxEntries.length) mapping.taxes = { list: { entries: taxEntries, required: "amount" } };
   const itemsKey = find("items", keys.filter((k) => Array.isArray(sample[k])));
   if (itemsKey) {
     const first = (sample[itemsKey] as unknown[])[0];

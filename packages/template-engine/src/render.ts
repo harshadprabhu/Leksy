@@ -1,4 +1,4 @@
-import { evaluate, getAll, getPath, interpolate, type Ctx } from "./expr.js";
+import { allBindingsEmpty, evaluate, getAll, getPath, interpolate, type Ctx } from "./expr.js";
 import type { Block, Condition, Style, Template } from "./schema.js";
 
 export interface RenderOptions {
@@ -86,8 +86,14 @@ export function checkCondition(cond: Condition | undefined, ctx: Ctx): boolean {
   }
 }
 
-/** Interpolate, then escape, then turn newlines into <br>. */
-const text = (tpl: string, ctx: Ctx) => esc(interpolate(tpl, ctx)).replace(/\n/g, "<br>");
+/** Interpolate, drop lines left empty by missing data, escape, then turn newlines into <br>. */
+const text = (tpl: string, ctx: Ctx) =>
+  esc(
+    interpolate(tpl, ctx)
+      .split("\n")
+      .filter((line, i, all) => line.trim() !== "" || all.length === 1)
+      .join("\n"),
+  ).replace(/\n/g, "<br>");
 
 function wrap(block: Block, inner: string, opts: RenderOptions, cls = ""): string {
   const id = opts.editor ? ` data-block-id="${esc(block.id)}"` : "";
@@ -154,7 +160,7 @@ function renderBlock(block: Block, ctx: Ctx, opts: RenderOptions): string {
     }
     case "kv_list": {
       const rows = block.props.rows
-        .filter((r) => checkCondition(r.visibleIf, ctx))
+        .filter((r) => checkCondition(r.visibleIf, ctx) && !allBindingsEmpty(r.value, ctx))
         .map((r, i, all) => {
           const strong = block.props.emphasizeLast && i === all.length - 1 ? " lx-strong" : "";
           return `<div class="lx-kv${strong}"><span>${text(r.label, ctx)}</span><span>${text(r.value, ctx)}</span></div>`;
@@ -169,8 +175,8 @@ function renderBlock(block: Block, ctx: Ctx, opts: RenderOptions): string {
       const parts: string[] = [kv("Subtotal", t.taxable)];
       if (t.discount) parts.push(kv("Discount", -t.discount));
       if (block.props.showTaxBreakup) {
-        const taxes = (getPath(ctx, "taxes") as { type: string; rate: number; amount: number }[] | undefined) ?? [];
-        for (const tx of taxes) parts.push(kv(`${tx.type} @ ${tx.rate}%`, tx.amount));
+        const taxes = (getPath(ctx, "taxes") as { type: string; rate?: number; amount: number }[] | undefined) ?? [];
+        for (const tx of taxes) parts.push(kv(tx.rate !== undefined ? `${tx.type} @ ${tx.rate}%` : tx.type, tx.amount));
       } else if (t.tax) parts.push(kv("Tax", t.tax));
       const charges = (getPath(ctx, "charges") as { label: string; amount: number }[] | undefined) ?? [];
       for (const c of charges) parts.push(kv(c.label, c.amount));
@@ -200,7 +206,7 @@ function renderBlock(block: Block, ctx: Ctx, opts: RenderOptions): string {
       const value = interpolate(block.props.value, ctx);
       const svg = value && opts.qr ? opts.qr(value, block.props.size) : `<div class="lx-placeholder" style="width:${block.props.size}px;height:${block.props.size}px;margin:auto">QR</div>`;
       const cap = block.props.caption ? `<div class="lx-muted">${text(block.props.caption, ctx)}</div>` : "";
-      return wrap(block, `<div class="lx-qr">${svg}</div>${cap}`, opts);
+      return wrap(block, `<div class="lx-qr">${svg}${cap}</div>`, opts);
     }
     case "button": {
       const href = safeUrl(interpolate(block.props.href, ctx)) ?? "#";
@@ -276,7 +282,7 @@ export function templateCss(t: Template): string {
 .lx-card .lx-kv{font-size:12px;padding:1px 0}
 .lx-cert{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid ${accent};border-radius:10px;margin-bottom:8px}
 .lx-cert a{color:${accent};font-weight:600;text-decoration:none}
-.lx-qr{display:flex;justify-content:center}
+.lx-qr{display:flex;flex-direction:column;align-items:center;gap:6px}
 .lx-qr svg{display:block}
 .lx-buttons{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .lx-button{display:inline-block;padding:10px 18px;border-radius:999px;background:${accent};color:#fff;text-decoration:none;font-weight:600;font-size:13px}

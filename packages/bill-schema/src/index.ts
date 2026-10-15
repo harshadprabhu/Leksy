@@ -65,7 +65,7 @@ export const ItemSchema = z.object({
 
 export const TaxLineSchema = z.object({
   type: z.string().max(16), // CGST, SGST, IGST, CESS, VAT
-  rate: z.number().min(0).max(100),
+  rate: z.number().min(0).max(100).optional(),
   amount: money,
 });
 
