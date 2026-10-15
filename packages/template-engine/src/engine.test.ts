@@ -33,6 +33,9 @@ describe("rendering", () => {
     expect(html).toContain("Temple Necklace");
     expect(html).toContain("IGI · LG612345678");
     expect(html).toContain("CGST @ 1.5%");
+    // Gross subtotal 2,80,888 − discount 4,825 + tax + round-off = total 2,84,345
+    expect(html).toContain("₹2,80,888.00");
+    expect(html).toContain("-₹4,825.00");
   });
 
   it("escapes user data and drops unsafe urls and colours", () => {

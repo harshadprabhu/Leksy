@@ -172,7 +172,8 @@ function renderBlock(block: Block, ctx: Ctx, opts: RenderOptions): string {
       const kv = (l: string, v: unknown, strong = false) =>
         `<div class="lx-kv${strong ? " lx-strong" : ""}"><span>${esc(l)}</span><span>${esc(String(evaluate("v | inr", { v })))}</span></div>`;
       const t = (getPath(ctx, "totals") ?? {}) as Record<string, number>;
-      const parts: string[] = [kv("Subtotal", t.taxable)];
+      // Gross subtotal, then the discount, so the lines add up to the total.
+      const parts: string[] = [kv("Subtotal", t.discount ? t.subtotal : t.taxable)];
       if (t.discount) parts.push(kv("Discount", -t.discount));
       if (block.props.showTaxBreakup) {
         const taxes = (getPath(ctx, "taxes") as { type: string; rate?: number; amount: number }[] | undefined) ?? [];
