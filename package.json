@@ -1,0 +1,21 @@
+{
+  "name": "leksy",
+  "private": true,
+  "description": "Leksy (pronounced \"Lexi\") — luxury digital e-bills, Mission Happiness feedback and retail analytics.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "db:migrate": "pnpm --filter @leksy/api db:migrate",
+    "db:seed": "pnpm --filter @leksy/api db:seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.8",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "@types/node": "^22.15.0"
+  }
+}
