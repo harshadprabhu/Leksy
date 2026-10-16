@@ -1,11 +1,13 @@
 "use client";
-import { ask, buildBrief, COPILOTS, findPersonalData, forecast, inr, nextWeekByRegion, SUGGESTIONS, toWeekly, upcomingMoments, type Answer, type CopilotId, type Dataset, type ForecastResult, type Metric } from "@leksy/insights";
+import { addDays, ask, buildBrief, inRange, totals, COPILOTS, findPersonalData, forecast, inr, nextWeekByRegion, SUGGESTIONS, toWeekly, upcomingMoments, type Answer, type CopilotId, type Dataset, type ForecastResult, type Metric } from "@leksy/insights";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BarChart, LineChart } from "@/components/insights/Chart";
+import { PALETTE } from "@/lib/analytics";
 import { Shell } from "@/components/Shell";
 import { contextSummary, localFreeAnswer, localNarrative, readAi, readDeck, type AiSettings, type DeckTheme } from "@/lib/ai";
 import { api } from "@/lib/api";
+import type { BrandKit } from "@/lib/brandpack";
 import { buildDeck } from "@/lib/deck";
 
 interface Item {
@@ -26,6 +28,7 @@ export default function Insights() {
   const [ds, setDs] = useState<Dataset | null>(null);
   const [ai, setAi] = useState<AiSettings | null>(null);
   const [deck, setDeck] = useState<DeckTheme | null>(null);
+  const [kit, setKit] = useState<BrandKit | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Item[]>([]);
@@ -43,6 +46,7 @@ export default function Insights() {
         setDs(d);
         setAi(readAi(me.brand.settings));
         setDeck(readDeck(me.brand.settings, me.brand.name));
+        setKit((me.brand.settings?.brandKit as BrandKit | undefined) ?? null);
       } catch (e) {
         setErr((e as Error).message);
       }
@@ -59,6 +63,7 @@ export default function Insights() {
   }, [ds, metric, store, horizon]);
 
   const nextWeek = useMemo(() => (ds ? nextWeekByRegion(ds) : []), [ds]);
+  const last30 = useMemo(() => (ds ? totals(inRange(ds, { from: addDays(ds.asOf, -29), to: ds.asOf, label: "last 30 days" })) : null), [ds]);
   const moments = useMemo(() => (ds ? upcomingMoments(ds, 45) : []), [ds]);
 
   const run = async (question: string) => {
@@ -94,25 +99,53 @@ export default function Insights() {
 
   return (
     <Shell>
-      <div className="head">
-        <div>
-          <h1>Insights</h1>
-          <div className="muted">Ask about your business, see what&apos;s coming, and take a ready deck to your next review.</div>
+      <section className="ins-hero">
+        {kit?.watermark && (kit.mark ?? kit.logo) && <div className="ins-hero-wm" style={{ backgroundImage: `url(${kit.logoLight ?? kit.mark ?? kit.logo})` }} aria-hidden="true" />}
+        <div className="ins-hero-main">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {(kit?.logoLight ?? kit?.logo) && <img className="ins-hero-logo" src={kit!.logoLight ?? kit!.logo} alt={kit!.name} />}
+          <div>
+            <div className="ins-kicker">Insights · {deck.company}</div>
+            <h1>Ask your business anything</h1>
+            <div className="ins-sub">
+              {ds.stores.length} stores · {new Set(ds.stores.map((x) => x.city)).size} cities · data to {new Date(`${ds.asOf}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
+            </div>
+          </div>
         </div>
-        <div className="row">
-          <span className="badge good" title="Answers are computed in this browser from your own data">
+        <div className="ins-stats">
+          {last30 && (
+            <div>
+              <b>{inr(last30.revenue)}</b>
+              <span>revenue, last 30 days</span>
+            </div>
+          )}
+          {nextWeek[0] && (
+            <div>
+              <b>{inr(nextWeek[0].value)}</b>
+              <span>forecast, next week</span>
+            </div>
+          )}
+          {last30?.rating != null && (
+            <div>
+              <b>{last30.rating.toFixed(2)} ★</b>
+              <span>customer happiness</span>
+            </div>
+          )}
+        </div>
+        <div className="ins-hero-foot">
+          <span className="ins-pill" title="Answers are computed in this browser from your own data">
             {ai.engine === "ollama" ? `Local engine + ${ai.ollamaModel} on your computer` : "Local engine · data stays on this device"}
           </span>
-          <Link className="btn sm" href="/settings#ai">
-            AI settings
+          <Link className="ins-pill link" href="/settings#ai">
+            AI settings →
           </Link>
         </div>
-      </div>
+      </section>
 
       <div className="grid" style={{ gridTemplateColumns: "minmax(0,1.6fr) minmax(320px,1fr)", alignItems: "start" }}>
         <div className="stack">
           <form
-            className="card stack"
+            className="card stack ask-card"
             onSubmit={(e) => {
               e.preventDefault();
               void run(q);
@@ -125,9 +158,9 @@ export default function Insights() {
               </button>
             </div>
             <div className="row" style={{ gap: 6 }}>
-              {SUGGESTIONS.map((s) => (
-                <button key={s} type="button" className="chip" onClick={() => void run(s)}>
-                  {s}
+              {SUGGESTIONS.map((s, i) => (
+                <button key={s} type="button" className="chip" style={{ "--c": PALETTE[i % PALETTE.length] } as React.CSSProperties} onClick={() => void run(s)}>
+                  <i /> {s}
                 </button>
               ))}
             </div>
@@ -208,7 +241,7 @@ export default function Insights() {
 
         <div className="stack" style={{ position: "sticky", top: 16 }}>
           {nextWeek.length > 0 && (
-            <div className="card stack">
+            <div className="card stack nw-card">
               {(() => {
                 const india = nextWeek.find((r) => r.region === "All India")!;
                 const regs = nextWeek.filter((r) => r.region !== "All India");
@@ -258,7 +291,7 @@ export default function Insights() {
               })()}
             </div>
           )}
-          <div className="card stack">
+          <div className="card stack fc-card">
             <div className="spread">
               <h2 style={{ margin: 0 }}>Forecast</h2>
               <span className="small muted">Learns from {Math.round(ds.days.length / Math.max(1, ds.stores.length) / 7)} weeks of history</span>
@@ -325,7 +358,13 @@ export default function Insights() {
             )}
           </div>
 
-          <div className="card stack">
+          <div className="card stack deck-card">
+            <div className="deck-cover" style={{ background: deck.primary }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {(kit?.logoLight ?? deck.logo) && <img src={kit?.logoLight ?? deck.logo} alt="" />}
+              <div style={{ fontFamily: "var(--brand-head)" }}>{deck.company}</div>
+              <span style={{ color: deck.accent }}>Leadership pack · {new Date(`${ds.asOf}T00:00:00Z`).toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" })}</span>
+            </div>
             <h2 style={{ margin: 0 }}>PowerPoint deck</h2>
             <div className="small muted">
               Leadership pack in {deck.company}&apos;s colours, fonts and logo: scorecard, next-week forecast by region, trend, regional season radar, national festivals, stores, happiness, category mix, decisions{deckAnswers.length ? ` + ${deckAnswers.length} of your answers` : ""}. Built on this computer.
@@ -356,7 +395,7 @@ export default function Insights() {
             </button>
           </div>
 
-          <div className="card stack">
+          <div className="card stack cp-card">
             <h2 style={{ margin: 0 }}>Extra help from a copilot</h2>
             {copilots.length ? (
               <>

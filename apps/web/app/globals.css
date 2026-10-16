@@ -11,6 +11,11 @@
   --warn: #b7791f;
   --bad: #b3261e;
   --radius: 10px;
+  /* Brand theme; a brand kit overrides these. */
+  --brand: #2b2620;
+  --brand-gold: #9c7a45;
+  --brand-head: "Cormorant Garamond", Georgia, serif;
+  --app-font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -27,9 +32,9 @@
   }
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--app-font); }
 a { color: inherit; }
-h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+h1 { font-family: var(--brand-head); font-size: 28px; font-weight: 600; margin: 0 0 4px; letter-spacing: .01em; }
 h2 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
 h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .muted { color: var(--muted); }
@@ -137,8 +142,8 @@ pre.code { background: var(--bg); border: 1px solid var(--line); border-radius: 
 .narrative { border-left: 3px solid var(--accent); padding: 6px 12px; background: var(--accent-soft); border-radius: 0 8px 8px 0; }
 .chart-tip { position: absolute; top: 4px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 12px; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,.08); white-space: nowrap; }
 .key { display: inline-block; width: 16px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
-.key.dashed { background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 8px); }
-.key.band { height: 10px; background: var(--accent); opacity: .2; }
+.key.dashed { background: repeating-linear-gradient(90deg, var(--brand-gold) 0 5px, transparent 5px 8px); }
+.key.band { height: 10px; background: var(--brand-gold); opacity: .25; }
 .key.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
 .hbar { display: grid; grid-template-columns: minmax(90px, 30%) 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
 .hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -214,3 +219,47 @@ pre.code { background: var(--bg); border: 1px solid var(--line); border-radius: 
 .side.branded .btn { background: transparent; border: 0; color: rgba(255, 255, 255, .72); }
 .side.branded .btn:hover { background: rgba(255, 255, 255, .08); color: #fff; }
 .legend.cols span { white-space: nowrap; font-size: 11.5px; }
+.linkish { border: 0; background: none; padding: 0; font: inherit; color: var(--brand-gold); text-decoration: underline; cursor: pointer; }
+
+/* ---------- Insights, in the brand's look ---------- */
+.ins-hero { position: relative; overflow: hidden; background: var(--brand); color: #fff; border-radius: 16px; padding: 26px 28px 18px; margin-bottom: 18px; display: grid; grid-template-columns: 1fr auto; gap: 18px 28px; align-items: center; box-shadow: 0 18px 40px -24px color-mix(in srgb, var(--brand) 80%, transparent); }
+.ins-hero::after { content: ""; position: absolute; left: 28px; right: 28px; bottom: 54px; height: 1px; background: linear-gradient(90deg, var(--brand-gold), transparent); opacity: .7; }
+.ins-hero-wm { position: absolute; right: -40px; top: -30px; width: 360px; height: 260px; background: center / contain no-repeat; opacity: .07; pointer-events: none; }
+.ins-hero-main { display: flex; gap: 22px; align-items: center; position: relative; }
+.ins-hero-logo { height: 78px; max-width: 150px; object-fit: contain; padding-right: 22px; border-right: 1px solid color-mix(in srgb, var(--brand-gold) 60%, transparent); }
+.ins-kicker { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--brand-gold); font-weight: 600; filter: brightness(1.25); }
+.ins-hero h1 { color: #fff; font-size: 34px; margin: 2px 0; }
+.ins-sub { color: rgba(255, 255, 255, .7); font-size: 13px; }
+.ins-stats { display: flex; gap: 26px; position: relative; }
+.ins-stats div { display: flex; flex-direction: column; }
+.ins-stats b { font-family: var(--brand-head); font-size: 28px; font-weight: 600; line-height: 1.1; }
+.ins-stats span { font-size: 11px; color: rgba(255, 255, 255, .65); letter-spacing: .04em; }
+.ins-hero-foot { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; position: relative; padding-top: 6px; }
+.ins-pill { font-size: 11.5px; padding: 3px 11px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .28); color: rgba(255, 255, 255, .85); text-decoration: none; }
+.ins-pill.link:hover { border-color: var(--brand-gold); color: #fff; }
+@media (max-width: 900px) { .ins-hero { grid-template-columns: 1fr; } .ins-stats { flex-wrap: wrap; } .ins-hero-logo { height: 56px; } .ins-hero h1 { font-size: 26px; } }
+.ask-card { border-top: 3px solid var(--brand-gold); }
+.ask-card input { border-radius: 999px !important; padding-left: 18px !important; }
+.answer { border-left: 4px solid var(--brand-gold); }
+.answer h2 { font-family: var(--brand-head); font-size: 22px; font-weight: 600; }
+.answer-points li::marker { color: var(--brand-gold); }
+.nw-card, .fc-card, .cp-card { border-top: 3px solid var(--brand); }
+.nw-card h2, .fc-card h2, .deck-card h2, .cp-card h2 { font-family: var(--brand-head); font-size: 20px; }
+.nw-card .kpi .v, .fc-card .kpi .v { font-family: var(--brand-head); font-size: 30px; color: var(--brand); }
+.deck-cover { border-radius: 10px; padding: 16px; color: #fff; display: flex; flex-direction: column; gap: 4px; }
+.deck-cover img { height: 40px; max-width: 120px; object-fit: contain; object-position: left; margin-bottom: 6px; }
+.deck-cover div { font-size: 20px; font-weight: 600; }
+.deck-cover span { font-size: 12px; }
+.deck-card .btn.primary { background: var(--brand); border-color: var(--brand); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .nw-card .kpi .v, :root:not([data-theme="light"]) .fc-card .kpi .v { color: var(--brand-gold); } }
+/* Brand serif fonts often use old-style figures; numbers stay level and aligned. */
+.ins-stats b, .nw-card .kpi .v, .fc-card .kpi .v, .answer h2, .ins-hero h1, h1, .kpi-tile .v, .tier-card .v { font-variant-numeric: lining-nums tabular-nums; }
+@media (max-width: 900px) {
+  .side { align-items: center; }
+  .ins-hero { padding: 20px 18px 14px; }
+  .ins-hero-main { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .ins-hero-logo { border-right: 0; padding-right: 0; height: 46px; }
+  .ins-hero::after { display: none; }
+}
+.ins-stats b, .nw-card .kpi .v, .fc-card .kpi .v { font-family: var(--app-font); font-weight: 600; letter-spacing: -.01em; }
+.ins-stats b { font-size: 26px; }

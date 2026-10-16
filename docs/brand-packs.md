@@ -1,6 +1,6 @@
 # Brand packs
 
-A brand pack is one JSON file that makes Leksy look like a client: name, logos, watermark, colours, fonts, store list and bespoke bill templates. Import it in **Settings → Brand kit → Import brand pack**.
+A brand pack is one JSON file that makes Leksy look like a client: name, logos, watermark, colours, fonts, store list and bespoke bill templates. Load it from the **Load brand pack…** button in the demo bar (every page), or in **Settings → Brand kit → Import brand pack**.
 
 - **Demo:** the pack is kept only in the browser (`localStorage`) and the demo rebuilds itself around it: stores, history, bills, templates and theme. "Remove pack" returns to the sample brand. Pilot assets are never published on the public site.
 - **Production:** importing updates the brand, adds or updates the pack's templates (published as new versions) and adds any new stores.
@@ -39,5 +39,6 @@ Region and tier are filled in from the city when left out. Images must be embedd
 |---|---|
 | Bill landing page and PDF | logo, colours, fonts; a faint watermark repeated down the page (`page.watermark` in any template, `{{brand.watermark_url}}`) |
 | Downloads | the brand's printable template (`pdfTemplate`), with amount in words (`{{total \| words}}`) |
-| Dashboard and app | logo in the sidebar, app colour, faint watermark |
+| Dashboard and app | logo in the sidebar, app colour, heading and body fonts, faint watermark |
+| Insights | branded header with logo and headline figures, brand serif headings, gold accents, multicolour charts, deck cover preview |
 | Insights deck | logo on a dark cover, corner logo and watermark on every slide, brand colours and footer |

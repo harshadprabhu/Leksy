@@ -2,6 +2,7 @@
 import type { ChartPoint } from "@leksy/insights";
 import { inr } from "@leksy/insights";
 import { useMemo, useState } from "react";
+import { PALETTE, REGION_COLORS } from "@/lib/analytics";
 
 type Unit = "inr" | "count" | "rating" | "pct";
 
@@ -54,17 +55,18 @@ export function LineChart({ points, unit, height = 240, width = 720 }: { points:
           </g>
         ))}
         {band.length > 0 && (
-          <path d={`${band.map(([i, p], k) => `${k ? "L" : "M"}${x(i)},${y(p.high!)}`).join("")}${[...band].reverse().map(([i, p]) => `L${x(i)},${y(p.low!)}`).join("")}Z`} fill="var(--accent)" opacity={0.15} />
+          <path d={`${band.map(([i, p], k) => `${k ? "L" : "M"}${x(i)},${y(p.high!)}`).join("")}${[...band].reverse().map(([i, p]) => `L${x(i)},${y(p.low!)}`).join("")}Z`} fill="var(--brand-gold)" opacity={0.18} />
         )}
         {firstF > 0 && <line x1={x(firstF - 1)} x2={x(firstF - 1)} y1={m.t} y2={H - m.b} stroke="var(--muted)" strokeDasharray="3 4" strokeWidth={1} />}
+        {actual.length > 1 && <path d={`${path(actual)}L${x(actual.at(-1)![0])},${y(0)}L${x(actual[0]![0])},${y(0)}Z`} fill="var(--brand-gold)" opacity={0.08} />}
         <path d={path(actual)} fill="none" stroke="var(--ink)" strokeWidth={2} strokeLinejoin="round" />
-        {fc.length > 1 && <path d={path(fc)} fill="none" stroke="var(--accent)" strokeWidth={2} strokeDasharray="6 4" strokeLinejoin="round" />}
-        {points.map((p, i) => (p.note ? <circle key={i} cx={x(i)} cy={y(p.value)} r={5} fill="var(--accent)" stroke="var(--panel)" strokeWidth={2} /> : null))}
+        {fc.length > 1 && <path d={path(fc)} fill="none" stroke="var(--brand-gold)" strokeWidth={2.5} strokeDasharray="6 4" strokeLinejoin="round" />}
+        {points.map((p, i) => (p.note ? <circle key={i} cx={x(i)} cy={y(p.value)} r={5} fill="#E34948" stroke="var(--panel)" strokeWidth={2} /> : null))}
         {points.map((p, i) => (i % every === 0 ? <text key={`l${i}`} x={x(i)} y={H - 8} textAnchor="middle" fontSize={11} fill="var(--muted)">{dayLabel(p.label)}</text> : null))}
         {h && hover != null && (
           <g>
             <line x1={x(hover)} x2={x(hover)} y1={m.t} y2={H - m.b} stroke="var(--muted)" strokeWidth={1} />
-            <circle cx={x(hover)} cy={y(h.value)} r={5} fill={h.forecast ? "var(--accent)" : "var(--ink)"} stroke="var(--panel)" strokeWidth={2} />
+            <circle cx={x(hover)} cy={y(h.value)} r={5} fill={h.forecast ? "var(--brand-gold)" : "var(--ink)"} stroke="var(--panel)" strokeWidth={2} />
           </g>
         )}
       </svg>
@@ -79,14 +81,14 @@ export function LineChart({ points, unit, height = 240, width = 720 }: { points:
               80% range {fmt(h.low, unit)} – {fmt(h.high!, unit)}
             </div>
           )}
-          {h.note && <div style={{ color: "var(--accent)" }}>{h.note}</div>}
+          {h.note && <div style={{ color: "#E34948" }}>{h.note}</div>}
         </div>
       )}
       <div className="row small muted" style={{ gap: 16, marginTop: 4 }}>
         <span><span className="key" style={{ background: "var(--ink)" }} /> Actual</span>
         {firstF >= 0 && <span><span className="key dashed" /> Forecast</span>}
         {band.length > 0 && <span><span className="key band" /> 80% range</span>}
-        {points.some((p) => p.note) && <span><span className="key dot" /> Festival week</span>}
+        {points.some((p) => p.note) && <span><span className="key dot" style={{ background: "#E34948" }} /> Festival week</span>}
       </div>
     </div>
   );
@@ -103,7 +105,7 @@ export function BarChart({ points, unit }: { points: ChartPoint[]; unit: Unit })
         <div key={p.label} className="hbar" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
           <span className="hbar-label" title={p.label}>{dayLabel(p.label)}</span>
           <span className="hbar-track">
-            <i style={{ width: `${(100 * p.value) / max}%`, opacity: hover == null || hover === i ? 1 : 0.55 }} />
+            <i style={{ width: `${(100 * Math.max(0, p.value)) / max}%`, opacity: hover == null || hover === i ? 1 : 0.55, background: REGION_COLORS[p.label.split(" (")[0]!] ?? PALETTE[i % PALETTE.length] }} />
           </span>
           <span className="hbar-value">{fmt(p.value, unit)}</span>
         </div>
