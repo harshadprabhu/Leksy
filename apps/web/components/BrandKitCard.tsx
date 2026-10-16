@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { api, DEMO } from "@/lib/api";
-import { BrandKitSchema, clearPack, deckFromKit, parsePack, savePack, type BrandKit } from "@/lib/brandpack";
+import { BrandKitSchema, clearPack, deckFromKit, loadPack, parsePack, savePack, type BrandKit } from "@/lib/brandpack";
 import { resetDemo } from "@/lib/demo";
 
 type Settings = Record<string, unknown>;
@@ -30,7 +30,8 @@ export function BrandKitCard({ brand, settings, onSaved }: { brand: { name: stri
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const set = (p: Partial<BrandKit>) => setK({ ...k, ...p });
-  const hasPack = !!settings.pack;
+  // In the demo a loaded pack replaces the built-in ORRA demo until removed.
+  const hasPack = DEMO && typeof window !== "undefined" && !!loadPack();
 
   const apply = async () => {
     setBusy(true);
@@ -142,7 +143,7 @@ export function BrandKitCard({ brand, settings, onSaved }: { brand: { name: stri
             <button
               className="btn sm"
               onClick={() => {
-                if (!confirm("Remove the brand pack and go back to the sample brand?")) return;
+                if (!confirm("Remove this brand pack and go back to the ORRA demo?")) return;
                 clearPack();
                 resetDemo();
                 window.location.reload();

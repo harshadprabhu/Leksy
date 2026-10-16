@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, auth, DEMO } from "@/lib/api";
-import { applyAppTheme, clearPack, loadPack, packFromHash, savePack, storePackFile, type BrandKit } from "@/lib/brandpack";
+import { applyAppTheme, packFromHash, savePack, type BrandKit } from "@/lib/brandpack";
 import { load, resetDemo } from "@/lib/demo";
 
 const BrandContext = createContext<BrandKit | null>(null);
@@ -117,29 +117,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
 function DemoBar() {
   const [last, setLast] = useState<{ url: string; invoice: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [packErr, setPackErr] = useState<string | null>(null);
-  const pack = loadPack();
-  const restart = () => {
-    resetDemo();
-    window.location.reload();
-  };
   return (
     <div className="card demo-bar">
       <div>
         <b>Demo mode.</b> <span className="muted">Sample data for &ldquo;{load().brand.name}&rdquo; ({load().stores.length} stores), kept in your browser. Nothing is sent.</span>
-        <div className="small" style={{ marginTop: 4 }}>
-          {pack ? (
-            <>
-              Brand pack loaded: <b>{pack.brand.name}</b> · bills, PDFs, dashboard, Insights and decks use its look.{" "}
-              <button className="linkish" onClick={() => confirm(`Remove the ${pack.brand.name} pack and go back to the sample brand?`) && (clearPack(), restart())}>
-                Remove pack
-              </button>
-            </>
-          ) : (
-            <span className="muted">Pitching a client? Load their brand pack to see every page in their logo, colours and stores.</span>
-          )}
-          {packErr && <span className="err"> {packErr}</span>}
-        </div>
         {last && (
           <div className="small" style={{ marginTop: 4 }}>
             Bill {last.invoice} sent on WhatsApp.{" "}
@@ -163,24 +144,6 @@ function DemoBar() {
         >
           Simulate a sale
         </button>
-        <label className="btn">
-          {pack ? "Change brand pack…" : "Load brand pack…"}
-          <input
-            type="file"
-            accept="application/json,.json,text/plain"
-            style={{ display: "none" }}
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              try {
-                await storePackFile(f);
-                restart();
-              } catch (er) {
-                setPackErr(`That file is not a valid brand pack: ${(er as Error).message}`);
-              }
-            }}
-          />
-        </label>
         <button
           className="btn"
           onClick={() => {

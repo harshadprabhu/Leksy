@@ -8,14 +8,15 @@
 import { BillSchema, validateBill, type Bill } from "@leksy/bill-schema";
 import { applyMapping, samplePaths, suggestMapping, type Mapping } from "@leksy/mapper";
 import { cleanAnswers, MISSION_HAPPINESS, SurveySchema, type Survey } from "@leksy/survey";
-import { buildDemoDataset, buildNetwork, regionOf, tierOf, staffFor, storeProfile, themesFor, THEMES, type Dataset, type SampleBill } from "@leksy/insights";
-import { deckFromKit, loadPack, type BrandPack } from "./brandpack";
+import { buildDemoDataset, regionOf, tierOf, staffFor, storeProfile, themesFor, THEMES, type Dataset, type SampleBill } from "@leksy/insights";
+import { deckFromKit, loadPack, parsePack, type BrandPack } from "./brandpack";
+import ORRA_PACK from "./orra-pack.json";
 import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type Condition, type Template } from "@leksy/template-engine";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const KEY = "lx_demo_v3"; // v3: a 400-store national network (tier 1 and tier 2 cities)
+const KEY = "lx_demo_v4"; // v4: the demo is ORRA Fine Jewellery (its 94 stores)
 const DAY = 864e5;
 
 interface DemoBill {
@@ -83,19 +84,10 @@ const token = () => {
 };
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Fictional national network: 400 stores over tier-1 metros and tier-2 cities. */
-const STATE: Record<string, string> = { North: "07", South: "29", East: "19", West: "27" };
-export const STORES = buildNetwork("", 400).map((st, i) => ({
-  code: st.code,
-  name: st.name,
-  city: st.city!,
-  region: st.region,
-  tier: st.tier,
-  address: `${st.name.replace(`${st.city} `, "")}, ${st.city}`,
-  managerName: `${["Priya", "Arjun", "Neha", "Kiran", "Sourav", "Meera", "Rahul", "Divya"][i % 8]} ${"NSKRDMPG"[(i * 3) % 8]}`,
-  managerPhone: `+9198${String(10000000 + i).slice(-8)}`,
-  gstin: `${STATE[st.region ?? ""] ?? "27"}ABCDE1234F1Z${(i % 9) + 1}`,
-}));
+/** The demo brand: ORRA Fine Jewellery, its stores, bill designs and look. */
+const DEFAULT_PACK: BrandPack = parsePack(ORRA_PACK);
+const activePack = () => loadPack() ?? DEFAULT_PACK;
+
 const NAMES = ["Meera Iyer", "Kabir Shah", "Aisha Khan", "Rohan Mehta", "Diya Kapoor", "Arjun Rao", "Sana Ali", "Ishaan Gupta", "Tara Menon", "Dev Patel", "Nisha Reddy", "Aditya Joshi", "Zoya Siddiqui", "Karan Malhotra", "Pooja Nair"];
 // Categories match the Insights category list, so bills and analytics line up.
 const CATALOG = [
@@ -111,8 +103,8 @@ const CATALOG = [
 const HUID = () => Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]).join("");
 
 // Set by seed() from the brand pack when one is imported.
-let brandName = "Aurum & Co.";
-let invoicePrefix = "AUR";
+let brandName = DEFAULT_PACK.brand.name;
+let invoicePrefix = DEFAULT_PACK.brand.invoicePrefix ?? "ORRA";
 
 function makeBill(rand: () => number, at: Date, storeCode: string, n: number): Bill {
   const count = rand() < 0.65 ? 1 : 2;
@@ -211,15 +203,14 @@ function packStores(p: BrandPack) {
 function seed(): DemoState {
   const rand = rng(42);
   const now = Date.now();
-  const pack = loadPack();
-  brandName = pack?.brand.name ?? "Aurum & Co.";
-  invoicePrefix = pack?.brand.invoicePrefix ?? (pack ? pack.brand.name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() : "AUR");
-  const stores = pack?.stores?.length ? packStores(pack) : STORES;
+  const pack = activePack();
+  brandName = pack.brand.name;
+  invoicePrefix = pack.brand.invoicePrefix ?? pack.brand.name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase();
+  const stores = packStores(pack);
   const ver = (key: string, name: string, body: Template) => ({ id: `tpl-${key}`, key, name, draft: body, publishedVersion: 1, updatedAt: new Date(now - 5 * DAY).toISOString(), versions: [{ version: 1, body, createdAt: new Date(now - 5 * DAY).toISOString() }] });
-  const billKey = pack?.billTemplate ?? "luxe-gold";
+  const billKey = pack.billTemplate ?? "luxe-gold";
   const state: DemoState = {
-    brand: pack
-      ? {
+    brand: {
           id: "brand-demo",
           name: pack.brand.name,
           slug: "pilot",
@@ -228,10 +219,9 @@ function seed(): DemoState {
           supportPhone: pack.brand.supportPhone ?? null,
           googleReviewUrl: pack.brand.googleReviewUrl ?? "https://www.google.com/maps",
           settings: { brandKit: pack.kit, deck: deckFromKit(pack.kit, pack.deck?.footer), ...(pack.pdfTemplate ? { pdfTemplate: pack.pdfTemplate } : {}), pack: true },
-        }
-      : { id: "brand-demo", name: "Aurum & Co.", slug: "aurum-demo", logoUrl: null, website: "https://example.com", supportPhone: "+91 80 4000 1234", googleReviewUrl: "https://www.google.com/maps", settings: {} },
+    },
     stores: stores.map((s) => ({ id: id(), managerEmail: null, ...s })),
-    templates: [...(pack?.templates ?? []).map((t) => ver(t.key, t.name, t.body)), ...Object.entries(PRESETS).map(([key, body]) => ver(key, body.name, body))],
+    templates: [...(pack.templates ?? []).map((t) => ver(t.key, t.name, t.body)), ...Object.entries(PRESETS).map(([key, body]) => ver(key, body.name, body))],
     triggers: [
       { id: id(), name: "High-value jewellery: protect with OTP", event: "bill.created", conditions: [{ field: "total", op: "gt", value: 200000 }], actions: { templateKey: billKey, surveyKey: "mission-happiness", channels: ["whatsapp", "sms", "email"], otpLock: true }, priority: 10, enabled: true },
       { id: id(), name: "Send every bill", event: "bill.created", conditions: [{ field: "customer.consent", op: "neq", value: false }], actions: { templateKey: billKey, surveyKey: "mission-happiness", channels: ["whatsapp", "sms", "email"] }, priority: 100, enabled: true },

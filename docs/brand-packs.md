@@ -5,7 +5,7 @@ A brand pack is one JSON file that makes Leksy look like a client: name, logos, 
 - **Demo:** the pack is kept only in the browser (`localStorage`) and the demo rebuilds itself around it: stores, history, bills, templates and theme. "Remove pack" returns to the sample brand. Pilot assets are never published on the public site.
 - **Production:** importing updates the brand, adds or updates the pack's templates (published as new versions) and adds any new stores.
 
-Packs belong to the client. Keep them out of this repository and use only logos and colours the brand has supplied or approved.
+The public demo runs as **ORRA Fine Jewellery** out of the box (`apps/web/lib/orra-pack.json`: its 94 stores from orra.com, logo and colours). Packs for other clients belong to those clients: keep them out of this repository unless they have agreed, and use only logos and colours the brand has supplied or approved.
 
 ## Format
 
