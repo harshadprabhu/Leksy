@@ -8,13 +8,13 @@
 import { BillSchema, validateBill, type Bill } from "@leksy/bill-schema";
 import { applyMapping, samplePaths, suggestMapping, type Mapping } from "@leksy/mapper";
 import { cleanAnswers, MISSION_HAPPINESS, SurveySchema, type Survey } from "@leksy/survey";
-import type { Dataset, DayRow } from "@leksy/insights";
+import { simulateHistory, type Dataset, type DayRow } from "@leksy/insights";
 import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type Condition, type Template } from "@leksy/template-engine";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const KEY = "lx_demo_v1";
+const KEY = "lx_demo_v2"; // v2: five stores across North, South, East and West
 const DAY = 864e5;
 
 interface DemoBill {
@@ -87,6 +87,7 @@ const STORES = [
   { code: "MUM-BANDRA", name: "Aurum & Co. Bandra", city: "Mumbai", address: "Linking Road, Bandra West", managerName: "Arjun S", managerPhone: "+919800000002", gstin: "27ABCDE1234F1Z9" },
   { code: "DEL-KHAN-MARKET", name: "Aurum & Co. Khan Market", city: "New Delhi", address: "Middle Lane, Khan Market", managerName: "Neha K", managerPhone: "+919800000003", gstin: "07ABCDE1234F1Z2" },
   { code: "HYD-JUBILEE", name: "Aurum & Co. Jubilee Hills", city: "Hyderabad", address: "Road No. 36, Jubilee Hills", managerName: "Kiran R", managerPhone: "+919800000004", gstin: "36ABCDE1234F1Z7" },
+  { code: "KOL-PARK-STREET", name: "Aurum & Co. Park Street", city: "Kolkata", address: "Park Street", managerName: "Sourav D", managerPhone: "+919800000005", gstin: "19ABCDE1234F1Z3" },
 ];
 const STAFF = [
   { id: "S-114", name: "Rahul" },
@@ -206,7 +207,7 @@ function seed(): DemoState {
     seq: 1000,
   };
   // ~120 bills over 30 days; Mumbai has slow billing, Delhi shines.
-  const mood: Record<string, number> = { "BLR-INDIRANAGAR": 4.2, "MUM-BANDRA": 3.0, "DEL-KHAN-MARKET": 4.6, "HYD-JUBILEE": 3.9 };
+  const mood: Record<string, number> = { "BLR-INDIRANAGAR": 4.2, "MUM-BANDRA": 3.0, "DEL-KHAN-MARKET": 4.6, "HYD-JUBILEE": 3.9, "KOL-PARK-STREET": 4.1 };
   for (let d = 29; d >= 0; d--) {
     const perDay = 2 + Math.floor(rand() * 5);
     for (let k = 0; k < perDay; k++) {
@@ -454,20 +455,17 @@ function summary(s: DemoState, from: Date, to: Date) {
 
 // ---------- Insights dataset ----------
 
-const DIWALI_ETC = ["2024-05-10", "2024-10-29", "2024-11-01", "2025-04-30", "2025-10-18", "2025-10-20", "2026-04-20"];
 const istDate = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10);
 
 /**
- * Daily aggregates for Insights: two years of store history (generated with
- * realistic seasonality: weekends, Akshaya Tritiya, Dhanteras/Diwali, wedding
- * season, 12% yearly growth) followed by the demo's real bills for the last 30 days.
+ * Daily aggregates for Insights: two years of generated store history (weekends,
+ * wedding season, 12% yearly growth, national and regional festivals) followed by
+ * the demo's real bills for the last 30 days.
  */
 function demoDataset(s: DemoState): Dataset {
   const asOf = istDate(new Date().toISOString());
   const detailFrom = new Date(Date.parse(`${asOf}T00:00:00Z`) - 29 * DAY).toISOString().slice(0, 10);
-  const rand = rng(7);
   const fbBy = new Map(s.feedback.map((f) => [f.billId, f]));
-  const mood: Record<string, number> = { "BLR-INDIRANAGAR": 4.2, "MUM-BANDRA": 3.1, "DEL-KHAN-MARKET": 4.6, "HYD-JUBILEE": 3.9 };
   const days: DayRow[] = [];
 
   // Real recent bills, by day and store.
@@ -491,35 +489,22 @@ function demoDataset(s: DemoState): Dataset {
     }
     recent.set(k, r);
   }
-  // Each store's recent daily average anchors the generated history.
-  const avgRecent = new Map<string, number>();
+  // Each store's recent daily average anchors the generated history (regional festivals included).
+  const dailyBase: Record<string, number> = {};
   for (const st of s.stores) {
     const rows = [...recent.values()].filter((r) => r.store === st.code);
-    avgRecent.set(st.code, Math.max(80000, rows.reduce((a, r) => a + r.revenue, 0) / 30));
+    dailyBase[st.code] = Math.max(80000, rows.reduce((a, r) => a + r.revenue, 0) / 30);
   }
-  const start = Date.parse(`${asOf}T00:00:00Z`) - 760 * DAY;
-  for (let t = start; ; t += DAY) {
-    const date = new Date(t).toISOString().slice(0, 10);
-    if (date >= detailFrom) break;
-    const yearsBack = (Date.parse(`${asOf}T00:00:00Z`) - t) / (365 * DAY);
-    const dow = new Date(t).getUTCDay();
-    const month = Number(date.slice(5, 7));
-    const near = DIWALI_ETC.map((d) => (Date.parse(`${d}T00:00:00Z`) - t) / DAY).find((x) => x >= -1 && x <= 3);
-    const festival = near === undefined ? 1 : 2.2 + (3 - near) * 0.4;
-    const wedding = [11, 12, 1, 2, 4, 5, 6].includes(month) ? 1.25 : [7, 8].includes(month) ? 0.82 : 1;
-    const weekend = dow === 0 || dow === 6 ? 1.35 : dow === 2 ? 0.85 : 1;
-    for (const st of s.stores) {
-      const base = (avgRecent.get(st.code) ?? 150000) / Math.pow(1.12, yearsBack);
-      const revenue = Math.round(base * festival * wedding * weekend * (0.8 + rand() * 0.4));
-      const bills = Math.max(1, Math.round(revenue / (95000 + rand() * 30000)));
-      const responses = Math.round(bills * 0.35 * (0.6 + rand() * 0.8));
-      const m = (mood[st.code] ?? 4) - (festival > 1 && st.code === "MUM-BANDRA" ? 0.4 : 0);
-      const ratingSum = Math.round(responses * Math.min(5, Math.max(1, m + (rand() - 0.5) * 0.6)));
-      const promoters = Math.round(responses * Math.max(0, (m - 3) / 2) * 0.8);
-      const detractors = Math.round(responses * Math.max(0, (4 - m) / 3) * 0.6);
-      days.push({ date, store: st.code, revenue, bills, ratingSum, ratingCount: responses, promoters, detractors, npsCount: responses });
-    }
-  }
+  days.push(
+    ...simulateHistory({
+      stores: s.stores.map((x) => ({ code: x.code, name: x.name, city: x.city })),
+      from: new Date(Date.parse(`${asOf}T00:00:00Z`) - 760 * DAY).toISOString().slice(0, 10),
+      toExclusive: detailFrom,
+      asOf,
+      dailyBase,
+      mood: { "BLR-INDIRANAGAR": 4.2, "MUM-BANDRA": 3.1, "DEL-KHAN-MARKET": 4.6, "HYD-JUBILEE": 3.9, "KOL-PARK-STREET": 4.1 },
+    }),
+  );
   days.push(...recent.values());
 
   // Bill-level breakdowns for the last 30 days.

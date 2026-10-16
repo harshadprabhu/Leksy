@@ -13,24 +13,15 @@ export interface AiSettings {
 export const DEFAULT_AI: AiSettings = { engine: "builtin", ollamaUrl: "http://localhost:11434", ollamaModel: "qwen2.5:7b", share: DEFAULT_POLICY };
 
 /** Company look for generated decks, kept in brand.settings.deck. */
-export interface DeckTheme {
-  company: string;
-  primary: string;
-  accent: string;
-  text: string;
-  headingFont: string;
-  bodyFont: string;
-  /** Logo as a data: URL (uploaded) or https URL. */
-  logo?: string;
-  footer: string;
-}
+export type { DeckTheme } from "@leksy/insights";
+import type { DeckTheme } from "@leksy/insights";
 
 export const DEFAULT_DECK = (company: string): DeckTheme => ({
   company,
-  primary: "#2A2118",
-  accent: "#B08D57",
-  text: "#1D1A16",
-  headingFont: "Georgia",
+  primary: "#1E2761",
+  accent: "#C9A227",
+  text: "#1F2937",
+  headingFont: "Cambria",
   bodyFont: "Calibri",
   footer: "Confidential. For internal use only.",
 });

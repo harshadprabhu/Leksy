@@ -3,9 +3,9 @@ import type { ChartPoint } from "@leksy/insights";
 import { inr } from "@leksy/insights";
 import { useMemo, useState } from "react";
 
-type Unit = "inr" | "count" | "rating";
+type Unit = "inr" | "count" | "rating" | "pct";
 
-const fmt = (v: number, unit: Unit) => (unit === "inr" ? inr(v) : unit === "rating" ? v.toFixed(1) : Math.round(v).toLocaleString("en-IN"));
+const fmt = (v: number, unit: Unit) => (unit === "inr" ? inr(v) : unit === "rating" ? v.toFixed(1) : unit === "pct" ? `${v >= 0 ? "+" : ""}${Math.round(v)}%` : Math.round(v).toLocaleString("en-IN"));
 const dayLabel = (s: string) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }) : s);
 
 function niceTicks(max: number, n = 4) {

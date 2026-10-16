@@ -20,6 +20,8 @@ export interface StoreInfo {
   code: string;
   name: string;
   city?: string;
+  /** North/South/East/West; inferred from the city when missing. */
+  region?: string;
 }
 
 export interface StaffRow {

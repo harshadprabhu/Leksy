@@ -6,7 +6,9 @@
  * later reword the summary, but never supplies the figures.
  */
 import { addDays, daily, inRange, inr, pct, totals, type Dataset, type Range } from "./dataset.js";
+import { REGIONS, type Region } from "./calendar.js";
 import { forecast, toWeekly, type ForecastResult, type Metric } from "./forecast.js";
+import { nextWeekByRegion, upcomingMoments } from "./seasons.js";
 
 export interface ChartPoint {
   label: string;
@@ -23,16 +25,18 @@ export interface Answer {
   intent: Intent;
   title: string;
   summary: string[];
-  chart?: { kind: "line" | "bar"; unit: "inr" | "count" | "rating"; points: ChartPoint[] };
+  chart?: { kind: "line" | "bar"; unit: "inr" | "count" | "rating" | "pct"; points: ChartPoint[] };
   table?: { columns: string[]; rows: (string | number)[][] };
   forecast?: ForecastResult;
   period?: Range;
   stores?: string[];
 }
 
-export type Intent = "forecast" | "stores" | "staff" | "categories" | "happiness" | "sales" | "bills" | "abv" | "preread" | "help";
+export type Intent = "season" | "nextweek" | "forecast" | "stores" | "staff" | "categories" | "happiness" | "sales" | "bills" | "abv" | "preread" | "help";
 
 export const SUGGESTIONS = [
+  "Forecast next week by region",
+  "Festival plan by region",
   "Sales in the last 30 days",
   "Forecast revenue for the next 8 weeks",
   "Which store has the lowest happiness?",
@@ -95,6 +99,8 @@ export function parseStores(q: string, ds: Dataset): string[] {
 export function detectIntent(q: string): Intent {
   const s = q.toLowerCase();
   if (/pre-?read|monthly (review|report)|board (pack|deck)|summary deck|business review/.test(s)) return "preread";
+  if (/next week|coming week|week ahead/.test(s) && !/next \d+ weeks/.test(s)) return "nextweek";
+  if (/festiv|season|pongal|onam|ugadi|karva|lohri|dussehra|navratri|durga|puja|baisakh|padwa|ganesh|akshaya|dhanteras|diwali|wedding|\b(north|south|east|west)\b|region|strategy|what (should|to) (we )?push|maximi[sz]e/.test(s)) return "season";
   if (/forecast|predict|projection|project(ed)?|next \d+ (week|month)|expect|outlook/.test(s)) return "forecast";
   if (/staff|salesperson|sales person|employee|associate|team member|who sold/.test(s)) return "staff";
   if (/categor|product|item|collection|mix/.test(s)) return "categories";
@@ -126,6 +132,41 @@ export function ask(question: string, ds: Dataset, opts: { horizonWeeks?: number
   const scope = stores.length ? stores.map((c) => storeName(ds, c)).join(", ") : "all stores";
 
   switch (intent) {
+    case "nextweek": {
+      const rows = nextWeekByRegion(ds);
+      const all = rows.find((r) => r.region === "All India");
+      const regs = rows.filter((r) => r.region !== "All India").sort((a, b) => b.value - a.value);
+      const sign = (n: number | null) => (n == null ? "–" : pct(n));
+      return {
+        ...base,
+        title: `Next week forecast · week of ${all ? label(all.week) : ""}`,
+        summary: all
+          ? [
+              `All India: ${inr(all.value)} (${inr(all.low)}–${inr(all.high)}) · ${sign(all.wowPct)} WoW · ${sign(all.yoyPct)} YoY`,
+              ...regs.map((r) => `${r.region}: ${inr(r.value)} · ${sign(r.wowPct)} WoW${r.festival ? ` · ${r.festival}` : ""}`),
+              `Model error (backtest): ${all.mape.toFixed(1)}%`,
+            ]
+          : ["Not enough history to forecast."],
+        chart: { kind: "bar", unit: "inr", points: regs.map((r) => ({ label: String(r.region), value: r.value, low: r.low, high: r.high })) },
+        table: { columns: ["Region", "Forecast", "Low", "High", "WoW", "YoY", "Festival"], rows: rows.map((r) => [String(r.region), inr(r.value), inr(r.low), inr(r.high), sign(r.wowPct), sign(r.yoyPct), r.festival ?? ""]) },
+      };
+    }
+    case "season": {
+      const s = question.toLowerCase();
+      const want = REGIONS.filter((r) => new RegExp(`\\b${r.toLowerCase()}\\b`).test(s));
+      const moments = upcomingMoments(ds, 75).filter((m) => !want.length || m.scope === "National" || m.scope.some((r: Region) => want.includes(r)));
+      const lift = (x: number | null) => (x == null ? "–" : `${x >= 1 ? "+" : ""}${Math.round((x - 1) * 100)}%`);
+      const where = (m: (typeof moments)[number]) => (m.scope === "National" ? "National" : m.scope.join("/"));
+      return {
+        ...base,
+        title: `Festival plan · next 75 days${want.length ? ` · ${want.join(", ")}` : " · all regions"}`,
+        summary: moments.length
+          ? moments.slice(0, 6).map((m) => `${where(m)} · ${m.name} (${label(m.date)}, ${m.daysTo}d): last ${lift(m.lastLift)} · push ${m.play.push.toLowerCase()} · ${m.play.activate.split(";")[0]}`)
+          : ["No festivals in the next 75 days for your regions."],
+        chart: { kind: "bar", unit: "pct", points: moments.filter((m) => m.lastLift != null).map((m) => ({ label: `${m.name} (${where(m)})`, value: Math.round((m.lastLift! - 1) * 100) })) },
+        table: { columns: ["When", "Days", "Where", "Occasion", "Last lift", "Push", "Stock", "Activate"], rows: moments.map((m) => [label(m.date), m.daysTo, where(m), m.name, lift(m.lastLift), m.play.push, m.play.stock, m.play.activate]) },
+      };
+    }
     case "forecast": {
       const metric: Metric = /bills|footfall|transactions|customers/.test(question.toLowerCase()) ? "bills" : "revenue";
       const n = Number(question.match(/next\s+(\d{1,2})\s+week/i)?.[1] ?? (Number(question.match(/next\s+(\d{1,2})\s+month/i)?.[1] ?? 0) * 4 || opts.horizonWeeks || 8));
@@ -201,7 +242,7 @@ export function ask(question: string, ds: Dataset, opts: { horizonWeeks?: number
                 .map((r) => `Happiest customers: ${r.name}, average ${(r.ratingSum / r.ratingCount).toFixed(1)} from ${r.ratingCount} ratings.`),
             ]
           : ["No staff data in this period."],
-        chart: { kind: "bar", unit: "inr", points: rows.slice(0, 10).map((r) => ({ label: r.name, value: r.revenue })) },
+        chart: { kind: "bar", unit: "inr", points: rows.slice(0, 10).map((r) => ({ label: `${r.name} · ${storeName(ds, r.store).replace(ds.brand, "").trim()}`, value: r.revenue })) },
         table: { columns: ["Staff", "Store", "Revenue", "Bills", "Avg rating"], rows: rows.map((r) => [r.name, storeName(ds, r.store), inr(r.revenue), r.bills, r.ratingCount ? r1(r.ratingSum / r.ratingCount) : "–"]) },
       };
     }

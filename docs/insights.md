@@ -40,8 +40,24 @@ Only when an admin allows external copilots, and only when a user chooses to:
 
 The model receives only the totals Leksy already computed.
 
-## Decks
+## Leadership pack (PowerPoint)
 
-Built in the browser with native PowerPoint charts and tables: cover, pre-read (performance, happiness, outlook, recommended actions), forecast, one slide per chosen answer, and a method slide. The look (colours, fonts, logo, footer) is set once in Settings → Deck template.
+Built in the browser with native, editable PowerPoint charts, in the company's colours, fonts and logo (Settings → Deck template). Metric-first, few words:
+
+1. Cover with next week's forecast and headline numbers
+2. Scorecard: revenue, bills, average bill, rating, NPS, responses with ▲▼ vs prior 30 days and last year
+3. Next week by region (All India = sum of regions), WoW and YoY, festival in the week
+4. Weekly trend with next week's forecast
+5. Regional season radar: each region's next festival, last year's lift, push / stock / go levers
+6. National moments (Dhanteras, Diwali, Akshaya Tritiya…) with forecast and playbook
+7. Stores, 8. Customer happiness, 9. Category mix
+10. Decisions for the week, each with a metric, owner and date
+11. Any answers the user ticked, then a short method slide
+
+Generated decks are checked against PowerPoint's own rules (escaped `&` in properties, no empty chart values, only inside labels on stacked charts).
 
 Importing a company's own `.potx` master directly is planned for the server version.
+
+## Regional calendar
+
+`packages/insights/src/calendar.ts` holds national moments (Akshaya Tritiya, Dhanteras, Diwali, wedding season) and regional ones: North (Lohri, Raksha Bandhan, Dussehra, Karva Chauth), South (Pongal, Ugadi, Onam), East (Poila Baisakh, Durga Puja), West (Gudi Padwa, Ganesh Chaturthi, Navratri), each with a playbook. Stores get their region from the city (or set it explicitly). Each region's forecast uses only its own festivals plus national ones. Lunar dates are approximate; verify with a local panchang.

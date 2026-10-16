@@ -85,3 +85,47 @@ describe("sharing", () => {
     expect(findPersonalData("mail a@b.com")).toContain("an email address");
   });
 });
+
+import { nextWeekByRegion, regionOf, simulateHistory, upcomingMoments } from "./index.js";
+
+describe("regional seasons", () => {
+  const stores = [
+    { code: "DEL", name: "Delhi store", city: "New Delhi" },
+    { code: "BLR", name: "Bengaluru store", city: "Bengaluru" },
+    { code: "KOL", name: "Kolkata store", city: "Kolkata" },
+  ];
+  const ds = {
+    brand: "Demo",
+    asOf: "2026-10-16",
+    stores,
+    days: simulateHistory({ stores, from: "2024-09-20", toExclusive: "2026-10-17", asOf: "2026-10-16", dailyBase: { DEL: 150000, BLR: 150000, KOL: 100000 } }),
+    detailDays: 30,
+    staff: [],
+    categories: [],
+    themes: [],
+  };
+
+  it("maps cities to regions", () => {
+    expect(regionOf({ city: "New Delhi" })).toBe("North");
+    expect(regionOf({ city: "Bengaluru" })).toBe("South");
+    expect(regionOf({ city: "Kolkata" })).toBe("East");
+    expect(regionOf({ city: "Atlantis" })).toBeNull();
+    expect(regionOf({ city: "Atlantis", region: "West" })).toBe("West");
+  });
+
+  it("makes All India the sum of the regions", () => {
+    const rows = nextWeekByRegion(ds);
+    const india = rows.find((r) => r.region === "All India")!;
+    const regions = rows.filter((r) => r.region !== "All India");
+    expect(regions.map((r) => r.region).sort()).toEqual(["East", "North", "South"]);
+    expect(india.value).toBeCloseTo(regions.reduce((a, r) => a + r.value, 0), 0);
+  });
+
+  it("finds regional festivals with last year's lift", () => {
+    const m = upcomingMoments(ds, 30);
+    const durga = m.find((x) => x.name === "Durga Puja");
+    expect(durga?.scope).toEqual(["East"]);
+    expect(durga!.lastLift!).toBeGreaterThan(1.1);
+    expect(m.find((x) => x.name === "Karva Chauth")?.scope).toEqual(["North"]);
+  });
+});

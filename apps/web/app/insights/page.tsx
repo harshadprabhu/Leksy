@@ -1,5 +1,5 @@
 "use client";
-import { ask, buildBrief, COPILOTS, findPersonalData, forecast, inr, SUGGESTIONS, toWeekly, type Answer, type CopilotId, type Dataset, type ForecastResult, type Metric } from "@leksy/insights";
+import { ask, buildBrief, COPILOTS, findPersonalData, forecast, inr, nextWeekByRegion, SUGGESTIONS, toWeekly, upcomingMoments, type Answer, type CopilotId, type Dataset, type ForecastResult, type Metric } from "@leksy/insights";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BarChart, LineChart } from "@/components/insights/Chart";
@@ -57,6 +57,9 @@ export default function Insights() {
       return null;
     }
   }, [ds, metric, store, horizon]);
+
+  const nextWeek = useMemo(() => (ds ? nextWeekByRegion(ds) : []), [ds]);
+  const moments = useMemo(() => (ds ? upcomingMoments(ds, 45) : []), [ds]);
 
   const run = async (question: string) => {
     if (!ds || !ai || !question.trim()) return;
@@ -204,6 +207,57 @@ export default function Insights() {
         </div>
 
         <div className="stack" style={{ position: "sticky", top: 16 }}>
+          {nextWeek.length > 0 && (
+            <div className="card stack">
+              {(() => {
+                const india = nextWeek.find((r) => r.region === "All India")!;
+                const regs = nextWeek.filter((r) => r.region !== "All India");
+                const delta = (n: number | null) => (n == null ? "–" : `${n >= 0 ? "▲" : "▼"} ${Math.abs(n).toFixed(1)}%`);
+                return (
+                  <>
+                    <div className="spread">
+                      <h2 style={{ margin: 0 }}>Next week</h2>
+                      <span className="small muted">w/c {new Date(`${india.week}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" })}</span>
+                    </div>
+                    <div className="row" style={{ alignItems: "baseline" }}>
+                      <span className="kpi"><span className="v">{inr(india.value)}</span></span>
+                      <span className={`badge ${india.wowPct != null && india.wowPct >= 0 ? "good" : "bad"}`}>{delta(india.wowPct)} WoW</span>
+                      <span className={`badge ${india.yoyPct != null && india.yoyPct >= 0 ? "good" : "bad"}`}>{delta(india.yoyPct)} YoY</span>
+                    </div>
+                    <table className="t">
+                      <tbody>
+                        {regs.map((r) => (
+                          <tr key={r.region}>
+                            <td>
+                              <span className={`region-dot r-${String(r.region).toLowerCase()}`} /> {r.region}
+                            </td>
+                            <td className="num">{inr(r.value)}</td>
+                            <td className="num" style={{ color: r.wowPct != null && r.wowPct >= 0 ? "var(--good)" : "var(--bad)" }}>{delta(r.wowPct)}</td>
+                            <td className="small muted">{r.festival ?? ""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {moments.length > 0 && (
+                      <div className="stack" style={{ gap: 4 }}>
+                        <span className="small muted">Coming up</span>
+                        {moments.slice(0, 4).map((m) => (
+                          <div key={`${m.name}${m.date}`} className="spread small">
+                            <span>
+                              <b>{m.name}</b> · {m.scope === "National" ? "All India" : m.scope.join("/")}
+                            </span>
+                            <span className="muted">
+                              {m.daysTo}d{m.lastLift != null ? ` · last ${m.lastLift >= 1 ? "+" : ""}${Math.round((m.lastLift - 1) * 100)}%` : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
           <div className="card stack">
             <div className="spread">
               <h2 style={{ margin: 0 }}>Forecast</h2>
@@ -274,7 +328,7 @@ export default function Insights() {
           <div className="card stack">
             <h2 style={{ margin: 0 }}>PowerPoint deck</h2>
             <div className="small muted">
-              In {deck.company}&apos;s colours, fonts and logo: cover, pre-read, forecast, {deckAnswers.length} answer slide{deckAnswers.length === 1 ? "" : "s"}, method. Built on this computer.
+              Leadership pack in {deck.company}&apos;s colours, fonts and logo: scorecard, next-week forecast by region, trend, regional season radar, national festivals, stores, happiness, category mix, decisions{deckAnswers.length ? ` + ${deckAnswers.length} of your answers` : ""}. Built on this computer.
             </div>
             <div className="row">
               <span className="swatch" style={{ background: deck.primary }} />
@@ -292,13 +346,7 @@ export default function Insights() {
               onClick={async () => {
                 setDeckBusy(true);
                 try {
-                  await buildDeck(ds, deck, deckAnswers, fc && metric === "revenue" && !store ? fc : (() => {
-                    try {
-                      return forecast(toWeekly(ds.days, "revenue", ds.asOf), 8, "revenue");
-                    } catch {
-                      return null;
-                    }
-                  })());
+                  await buildDeck(ds, deck, deckAnswers);
                 } finally {
                   setDeckBusy(false);
                 }

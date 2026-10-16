@@ -6,7 +6,7 @@
  * the most accurate one is used, so the engine "learns" which pattern fits each
  * company and store best. Ranges come from that model's own backtest errors.
  */
-import { FESTIVALS, isWeddingSeason } from "./calendar.js";
+import { festivalsFor, isWeddingSeason, type Festival } from "./calendar.js";
 import { addDays, daily, type DayRow } from "./dataset.js";
 
 export type Metric = "revenue" | "bills";
@@ -57,12 +57,15 @@ export function toWeekly(rows: DayRow[], metric: Metric, asOf: string): WeekPoin
 }
 
 /** Festivals falling in the week starting `week`, e.g. "Dhanteras, Diwali". */
+/** Festivals used by the current fit (national, plus the series' regions). Set by forecast(). */
+let ACTIVE: Festival[] = festivalsFor();
+
 const festivalIn = (week: string) => {
-  const names = FESTIVALS.filter((f) => f.date >= week && f.date <= addDays(week, 6)).map((f) => f.name);
+  const names = ACTIVE.filter((f) => f.date >= week && f.date <= addDays(week, 6)).map((f) => f.name);
   return names.length ? { name: names.join(", ") } : undefined;
 };
 /** The week before a festival also lifts (people buy ahead of Dhanteras/Diwali). */
-const festivalAhead = (week: string) => FESTIVALS.find((f) => f.date > addDays(week, 6) && f.date <= addDays(week, 13));
+const festivalAhead = (week: string) => ACTIVE.find((f) => f.date > addDays(week, 6) && f.date <= addDays(week, 13));
 
 function features(week: string, t: number): number[] {
   const doy = (Date.parse(`${week}T00:00:00Z`) - Date.parse(`${week.slice(0, 4)}-01-01T00:00:00Z`)) / 864e5;
@@ -187,7 +190,8 @@ const mapeOf = (actual: number[], pred: number[]) => {
   return pairs.length ? (100 * pairs.reduce((s, [a, p]) => s + Math.abs(a - p) / a, 0)) / pairs.length : Infinity;
 };
 
-export function forecast(history: WeekPoint[], horizon: number, metric: Metric, holdoutWeeks = 8): ForecastResult {
+export function forecast(history: WeekPoint[], horizon: number, metric: Metric, holdoutWeeks = 8, festivals: Festival[] = festivalsFor()): ForecastResult {
+  ACTIVE = festivals;
   if (history.length < 6) throw new Error("Need at least 6 weeks of history to forecast");
   const hold = Math.min(holdoutWeeks, Math.floor(history.length / 4));
   const train = history.slice(0, -hold);

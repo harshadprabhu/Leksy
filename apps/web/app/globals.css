@@ -148,3 +148,5 @@ pre.code { background: var(--bg); border: 1px solid var(--line); border-radius: 
 .swatch { width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--line); display: inline-block; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: grid; place-items: center; padding: 16px; z-index: 50; }
 .deck-preview { border-radius: 10px; padding: 18px 20px; aspect-ratio: 16 / 9; max-width: 320px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.region-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.r-north { background: #2a78d6; } .r-south { background: #eb6834; } .r-east { background: #1baf7a; } .r-west { background: #eda100; }

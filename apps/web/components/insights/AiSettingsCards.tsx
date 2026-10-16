@@ -126,7 +126,7 @@ export function AiSettingsCard({ settings, onSaved }: { settings: Settings; onSa
   );
 }
 
-const FONTS = ["Calibri", "Arial", "Georgia", "Garamond", "Segoe UI", "Helvetica", "Times New Roman", "Trebuchet MS", "Verdana", "Cambria"];
+const FONTS = ["Calibri", "Cambria", "Arial", "Times New Roman", "Bookman Old Style", "Century Schoolbook", "Georgia", "Segoe UI", "Verdana"];
 
 /** The company look used for generated PowerPoint decks. */
 export function DeckSettingsCard({ settings, company, onSaved }: { settings: Settings; company: string; onSaved: () => void }) {
