@@ -91,7 +91,7 @@ export default function Feedback() {
           ))}
         </div>
       </div>
-      <div className="card">
+      <div className="card" style={{ overflowX: "auto" }}>
         <table className="t branded">
           <thead>
             <tr>

@@ -10,9 +10,32 @@ const BrandContext = createContext<BrandKit | null>(null);
 /** The brand kit for pages inside the shell (null when the brand has none). */
 export const useBrand = () => useContext(BrandContext);
 
-/** The brand's kit (logo, colours, watermark), re-read when Settings changes it. */
+/** The kit known without waiting for the network: the demo's own, or the one remembered from the last visit. */
+function knownKit(): BrandKit | null {
+  try {
+    if (DEMO) return (load().brand.settings?.brandKit as BrandKit | undefined) ?? null;
+    const raw = localStorage.getItem(KIT_KEY);
+    return raw ? (JSON.parse(raw) as BrandKit) : null;
+  } catch {
+    return null;
+  }
+}
+const KIT_KEY = "lx_kit";
+
+/**
+ * The brand's kit (logo, colours, watermark). It is read before the shell first
+ * draws, so the app never shows another look first; then refreshed from the
+ * server, and again whenever Settings changes it.
+ */
 function useBrandKit(ready: boolean) {
   const [kit, setKit] = useState<BrandKit | null>(null);
+  const [known, setKnown] = useState(false);
+  useEffect(() => {
+    const k = knownKit();
+    setKit(k);
+    if (k) applyAppTheme(k);
+    setKnown(true);
+  }, []);
   useEffect(() => {
     if (!ready) return;
     const read = () =>
@@ -21,6 +44,10 @@ function useBrandKit(ready: boolean) {
           const k = m.brand.settings?.brandKit ?? null;
           setKit(k);
           applyAppTheme(k);
+          try {
+            if (k) localStorage.setItem(KIT_KEY, JSON.stringify(k));
+            else localStorage.removeItem(KIT_KEY);
+          } catch {}
         },
         () => undefined,
       );
@@ -28,7 +55,7 @@ function useBrandKit(ready: boolean) {
     window.addEventListener("lx-brand", read);
     return () => window.removeEventListener("lx-brand", read);
   }, [ready]);
-  return kit;
+  return { kit, known };
 }
 
 const NAV = [
@@ -69,9 +96,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
     if (!auth.token) router.replace("/login");
     else setReady(true);
   }, [router]);
-  const kit = useBrandKit(ready);
+  const { kit, known } = useBrandKit(ready);
   if (opening) return <div className="empty">Opening the brand demo…</div>;
-  if (!ready) return null;
+  // Draw nothing until the brand is known, so no other logo or colour flashes first.
+  if (!ready || !known) return null;
   const sideLogo = kit?.ui ? (kit.logoLight ?? kit.logo) : kit?.logo;
   return (
     <div className="shell">
@@ -92,7 +120,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {label}
           </Link>
         ))}
-        <div style={{ flex: 1 }} />
+        <div className="side-spacer" />
         <button
           className="nav btn"
           style={{ border: 0, textAlign: "left" }}

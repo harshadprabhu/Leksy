@@ -7,6 +7,7 @@
  */
 import { TemplateSchema, type Template } from "@leksy/template-engine";
 import { z } from "zod";
+import { fontsHref, THEME_KEY, themeVars } from "./theme";
 
 const DataImage = z.string().max(2_000_000).regex(/^data:image\/(png|jpeg|svg\+xml|webp);base64,[A-Za-z0-9+/=]+$/, "images must be embedded (data:image/…)");
 const Hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -113,41 +114,38 @@ export function deckFromKit(kit: BrandKit, footer?: string) {
   };
 }
 
-const GOOGLE_FONTS = ["Cormorant Garamond", "Playfair Display", "Cinzel", "Marcellus", "Red Hat Display", "Nunito", "Inter", "Montserrat", "Lato", "Figtree"];
 const THEME_VARS = ["--accent", "--accent-soft", "--brand-ink", "--brand", "--brand-gold", "--brand-head", "--app-font"];
 
 /** Load a brand's Google fonts once (others are expected to be installed). */
-function loadFonts(fonts: string[]) {
-  const want = [...new Set(fonts)].filter((f) => GOOGLE_FONTS.includes(f));
-  if (!want.length) return;
-  const id = `lx-fonts-${want.join("-").replace(/\W+/g, "")}`;
-  if (document.getElementById(id)) return;
+function loadFonts(href: string | null) {
+  if (!href || [...document.querySelectorAll("link[rel=stylesheet]")].some((l) => (l as HTMLLinkElement).href === href)) return;
   const link = document.createElement("link");
-  link.id = id;
   link.rel = "stylesheet";
-  link.href = `https://fonts.googleapis.com/css2?${want.map((f) => `family=${encodeURIComponent(f)}:wght@400;500;600;700`).join("&")}&display=swap`;
+  link.href = href;
   document.head.appendChild(link);
 }
 
 /**
  * Apply a kit to the whole app: its main colour (sidebar, headers, buttons), its
- * accent (highlights, forecast lines), and its heading and body fonts.
+ * accent (highlights, forecast lines), and its heading and body fonts. The theme
+ * is remembered so the next visit paints in the brand's look from the first frame.
  */
 export function applyAppTheme(kit: BrandKit | null) {
   const root = document.documentElement.style;
   if (!kit) {
     for (const v of THEME_VARS) root.removeProperty(v);
+    try {
+      localStorage.removeItem(THEME_KEY);
+    } catch {}
     return;
   }
-  const c = kit.ui ?? kit.accent;
-  root.setProperty("--accent", c);
-  root.setProperty("--accent-soft", `color-mix(in srgb, ${c} 12%, transparent)`);
-  root.setProperty("--brand-ink", kit.primary);
-  root.setProperty("--brand", kit.ui ?? kit.primary);
-  root.setProperty("--brand-gold", kit.accent);
-  root.setProperty("--brand-head", `"${kit.headingFont}", Georgia, serif`);
-  root.setProperty("--app-font", `"${kit.bodyFont}", Inter, system-ui, sans-serif`);
-  loadFonts([kit.headingFont, kit.bodyFont]);
+  const vars = themeVars(kit);
+  for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
+  const fonts = fontsHref([kit.headingFont, kit.bodyFont]);
+  loadFonts(fonts);
+  try {
+    localStorage.setItem(THEME_KEY, JSON.stringify({ vars, fonts }));
+  } catch {}
 }
 
 /** Demo: keep a pack file in this browser (the caller then rebuilds the demo). */

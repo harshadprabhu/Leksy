@@ -292,3 +292,44 @@ table.t.branded thead th:last-child { border-top-right-radius: 8px; }
 @media (max-width: 600px) { .faces-row { gap: 4px; } .face-col .small { font-size: 10px; } }
 .nowrap { white-space: nowrap; }
 .face-track { height: 64px; }
+
+/* ---------- Phones and small tablets ---------- */
+@media (max-width: 1100px) { .dash-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) {
+  .shell { display: block; }
+  .side { position: sticky; top: 0; z-index: 20; height: auto; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 2px; padding: 8px 10px; overflow-x: auto; scrollbar-width: none; border-right: 0; border-bottom: 1px solid var(--line); }
+  .side::-webkit-scrollbar { display: none; }
+  .side .brand-logo { padding: 0 10px 0 2px; flex: none; }
+  .side .brand-logo img { max-height: 36px; max-width: 84px; margin: 0; }
+  .side .brand-logo small, .side .logo small { display: none; }
+  .side .logo { padding: 0 10px 0 4px; font-size: 20px; flex: none; }
+  .side .nav { white-space: nowrap; flex: none; padding: 7px 11px; }
+  .side-spacer { display: none; }
+  .main { padding: 14px 12px 28px; }
+  .app-wm { left: 0; }
+}
+@media (max-width: 600px) {
+  h1 { font-size: 24px; }
+  .head { margin-bottom: 12px; }
+  .head .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .seg button { white-space: nowrap; }
+  .demo-bar { padding: 10px 12px; font-size: 12.5px; }
+  .demo-bar .btn { padding: 5px 10px; font-size: 12.5px; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .kpi-tile { padding: 10px 10px 4px; }
+  .kpi-tile .v { font-size: 19px; }
+  .kpi-tile .d { font-size: 11px; }
+  .card { padding: 12px; }
+  .dash-grid { gap: 10px; }
+  .legend.cols { grid-template-columns: 1fr; }
+  .frow { grid-template-columns: 92px minmax(0, 1fr) 96px; gap: 6px; }
+  .tier-card .v { font-size: 17px; }
+  .league .hide-sm, .hide-sm { display: none; }
+  .league td, .league th { padding: 8px 5px; }
+  .chips select { max-width: 100%; }
+}
+@media (max-width: 600px) {
+  .dash-grid .spread, .card > .spread { flex-wrap: wrap; row-gap: 2px; }
+  .dash-grid .spread > .small, .card > .spread > .small { font-size: 11px; }
+}
+.league td.num { white-space: nowrap; }

@@ -262,9 +262,9 @@ export default function Dashboard() {
             {M.label} by {level} {level !== "store" && <span className="small muted">· click a bar to drill in</span>}
           </h2>
           <ResponsiveContainer width="100%" height={Math.max(160, bars.length * 28)}>
-            <BarChart data={bars} layout="vertical" margin={{ left: 8, right: 30 }}>
+            <BarChart data={bars} layout="vertical" margin={{ left: 4, right: 64 }}>
               <XAxis type="number" hide />
-              <YAxis type="category" dataKey="name" tick={TICK} width={130} />
+              <YAxis type="category" dataKey="name" tick={TICK} width={level === "store" ? 130 : 84} />
               <Tooltip formatter={(v: number) => [fmt(v, metric), M.label]} />
               <Bar dataKey="value" radius={[0, 6, 6, 0]} cursor="pointer" onClick={(d: { k: string }) => drill(d.k)} label={{ position: "right", fill: "#8a8178", fontSize: 11, formatter: (v: number) => fmt(v, metric) }}>
                 {bars.map((x, i) => (
@@ -383,9 +383,9 @@ export default function Dashboard() {
                 <tr>
                   <th>#</th>
                   <th>Store</th>
-                  <th>City</th>
+                  <th className="hide-sm">City</th>
                   {(["revenue", "bills", "abv", "rating", "nps", "openRate"] as MetricKey[]).map((k) => (
-                    <th key={k} className="num sortable" onClick={() => setSort({ key: k, desc: sort.key === k ? !sort.desc : true })}>
+                    <th key={k} className={`num sortable ${["abv", "nps", "openRate"].includes(k) ? "hide-sm" : ""}`} onClick={() => setSort({ key: k, desc: sort.key === k ? !sort.desc : true })}>
                       {METRICS[k].label}
                       {sort.key === k ? (sort.desc ? " ▼" : " ▲") : ""}
                     </th>
@@ -403,16 +403,16 @@ export default function Dashboard() {
                       <td>
                         <span className="dot" style={{ background: REGION_COLORS[r.s.region] }} /> {r.s.name}
                       </td>
-                      <td className="muted">
+                      <td className="muted hide-sm">
                         {r.s.city}
                         {r.s.tier ? ` · T${r.s.tier}` : ""}
                       </td>
                       <td className="num">{fmtInr(r.a.revenue)}</td>
                       <td className="num">{r.a.bills.toLocaleString("en-IN")}</td>
-                      <td className="num">{fmt(value(r.a, "abv"), "abv")}</td>
+                      <td className="num hide-sm">{fmt(value(r.a, "abv"), "abv")}</td>
                       <td className="num">{rt == null ? "–" : <span className={`badge ${rt < 3.5 ? "bad" : rt < 4 ? "warn" : "good"}`}>{rt.toFixed(2)}</span>}</td>
-                      <td className="num">{fmt(value(r.a, "nps"), "nps")}</td>
-                      <td className="num">{fmt(value(r.a, "openRate"), "openRate")}</td>
+                      <td className="num hide-sm">{fmt(value(r.a, "nps"), "nps")}</td>
+                      <td className="num hide-sm">{fmt(value(r.a, "openRate"), "openRate")}</td>
                       <td className={`num ${ch.good == null ? "" : ch.good ? "up" : "down"}`}>{ch.text}</td>
                     </tr>
                   );
