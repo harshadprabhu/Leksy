@@ -268,7 +268,8 @@ function renderBlock(block: Block, ctx: Ctx, opts: RenderOptions): string {
           const tag = href ? "a" : "div";
           const linkAttrs = href ? ` href="${esc(href)}" target="_blank" rel="noopener"` : "";
           const label = ` aria-label="${esc(interpolate(sl.title, ctx) || `Slide ${i + 1}`)}"`;
-          if (img) return `<${tag} class="lx-slide lx-slide-img"${linkAttrs}${label}><img src="${esc(img)}" alt="${esc(interpolate(sl.title, ctx))}"></${tag}>`;
+          // Only the first banner loads up front; the rest load as the carousel nears them.
+          if (img) return `<${tag} class="lx-slide lx-slide-img"${linkAttrs}${label}><img src="${esc(img)}" alt="${esc(interpolate(sl.title, ctx))}"${i ? ' loading="lazy"' : ""} decoding="async"></${tag}>`;
           const bg = safeColor(sl.background) ?? "#2b2b33";
           const bg2 = safeColor(sl.background2) ?? bg;
           const color = safeColor(sl.color) ?? "#ffffff";
@@ -344,7 +345,7 @@ export function templateCss(t: Template): string {
 .lx-car-track::-webkit-scrollbar{display:none}
 .lx-slide{position:relative;flex:0 0 100%;scroll-snap-align:center;min-height:168px;border-radius:16px;overflow:hidden;display:flex;align-items:center;text-decoration:none;box-sizing:border-box;padding:20px 22px}
 .lx-slide-img{padding:0;min-height:0}
-.lx-slide-img img{width:100%;display:block}
+.lx-slide-img img{width:100%;height:100%;object-fit:cover;display:block;background:rgba(0,0,0,.04)}
 .lx-slide-art{position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:46%;opacity:.95;pointer-events:none}
 .lx-slide-art svg{width:100%;height:auto;display:block}
 .lx-slide-text{position:relative;max-width:62%;display:flex;flex-direction:column;gap:5px}

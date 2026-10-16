@@ -16,7 +16,7 @@ import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const KEY = "lx_demo_v6"; // v6: ORRA Fine Jewellery (its 94 stores), rich e-bill page with banners and socials
+const KEY = "lx_demo_v7"; // v7: ORRA Fine Jewellery (its 94 stores), e-bill with ORRA's own campaign banners
 const DAY = 864e5;
 
 interface DemoBill {
@@ -100,7 +100,7 @@ const CATALOG = [
   { name: "Diamond Pendant", category: "Pendant", metal: "Gold", purity: "18K", wt: 2.8, rate: 0, making: 0, price: 58500, stone: 0.3, cert: "IGI" },
   { name: "Platinum Band", category: "Rings", metal: "Platinum", purity: "PT950", wt: 6.1, rate: 3350, making: 4100, cert: "WARRANTY" },
 ];
-const HUID = () => Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]).join("");
+const HUID = (rand: () => number) => Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(rand() * 31)]).join("");
 
 // Set by seed() from the brand pack when one is imported.
 let brandName = DEFAULT_PACK.brand.name;
@@ -111,7 +111,7 @@ function makeBill(rand: () => number, at: Date, storeCode: string, n: number): B
   const items = Array.from({ length: count }, () => {
     const p = CATALOG[Math.floor(rand() * CATALOG.length)]!;
     const price = p.price ?? Math.round(p.wt * p.rate + p.making);
-    const huid = HUID();
+    const huid = HUID(rand);
     const discount = rand() < 0.25 ? Math.round(price * 0.05) : 0;
     return {
       name: p.name,
@@ -282,13 +282,13 @@ function pickSome(rand: () => number, opts: string[]) {
   return [...out];
 }
 
-function addBill(state: DemoState, bill: Bill, source: string, at = new Date()): DemoBill {
+function addBill(state: DemoState, bill: Bill, source: string, at = new Date(), tok = token()): DemoBill {
   const trigger = state.triggers.filter((t) => t.enabled && t.event === "bill.created").sort((a, b) => a.priority - b.priority).find((t) => t.conditions.every((c: Condition) => checkCondition(c, bill as any)));
   const actions = trigger?.actions ?? { templateKey: "luxe-gold", channels: ["whatsapp"] };
   const tpl = state.templates.find((t) => t.key === (bill.template ?? actions.templateKey)) ?? state.templates[0]!;
   const row: DemoBill = {
     id: id(),
-    token: token(),
+    token: tok,
     invoiceNo: bill.invoice_no,
     storeCode: bill.store_code,
     total: bill.total.toFixed(2),
@@ -352,10 +352,31 @@ export function load(): DemoState {
   save();
   return cache;
 }
+/**
+ * Older demo versions left their data behind, and every github.io page shares one
+ * storage quota; once it is full, new bills silently stop being saved. Clear them.
+ */
+function dropOldVersions() {
+  try {
+    for (const k of Object.keys(localStorage)) if (/^lx_demo_v\d+$/.test(k) && k !== KEY) localStorage.removeItem(k);
+  } catch {}
+}
+let cleaned = false;
 function save() {
+  if (!cache) return;
+  if (!cleaned) {
+    dropOldVersions();
+    cleaned = true;
+  }
   try {
     localStorage.setItem(KEY, JSON.stringify(cache));
-  } catch {}
+  } catch {
+    // Still full: keep the newest activity log and try once more.
+    cache.events = cache.events.slice(-300);
+    try {
+      localStorage.setItem(KEY, JSON.stringify(cache));
+    } catch {}
+  }
 }
 export function resetDemo() {
   try {
@@ -395,7 +416,26 @@ export function billTemplate(state: DemoState, bill: DemoBill): Template {
 
 export function findBillByToken(t: string) {
   const s = load();
-  return s.bills.find((b) => b.token === t) ?? null;
+  return s.bills.find((b) => b.token === t) ?? restoreSimulated(s, t);
+}
+
+/**
+ * A simulated sale's link names everything needed to make the same bill again
+ * (random seed, time, invoice number, store), so the customer link opens on any
+ * phone or browser, not only the one that pressed "Simulate a sale".
+ */
+const simToken = (seed: number, at: number, seq: number, storeIdx: number) => `S${[seed, at, seq, storeIdx].map((n) => n.toString(36)).join("-")}`;
+
+function restoreSimulated(s: DemoState, t: string): DemoBill | null {
+  const m = /^S([0-9a-z]+)-([0-9a-z]+)-([0-9a-z]+)-([0-9a-z]+)$/.exec(t);
+  if (!m) return null;
+  const [seed, at, seq, storeIdx] = m.slice(1).map((x) => parseInt(x, 36)) as [number, number, number, number];
+  const store = s.stores[storeIdx];
+  if (!store || at > Date.now() + DAY || at < Date.now() - 400 * DAY) return null;
+  const row = addBill(s, makeBill(rng(seed), new Date(at), store.code, seq), "api", new Date(at), t);
+  s.seq = Math.max(s.seq, seq);
+  save();
+  return row;
 }
 
 export function markOpened(bill: DemoBill) {
@@ -439,9 +479,13 @@ export function hasFeedback(bill: DemoBill) {
 /** A new sale, as if a store's POS had just called POST /v1/bills. */
 export function simulateSale(storeCode?: string): DemoBill {
   const s = load();
-  const rand = rng(Date.now() % 100000);
-  const store = storeCode ?? s.stores[Math.floor(Math.random() * s.stores.length)]!.code;
-  const row = addBill(s, makeBill(rand, new Date(), store, ++s.seq), "api");
+  const seed = Date.now() % 100000;
+  const now = new Date();
+  const known = storeCode ? s.stores.findIndex((x) => x.code === storeCode) : Math.floor(Math.random() * s.stores.length);
+  const store = storeCode ?? s.stores[known]!.code;
+  const seq = ++s.seq;
+  // Stores outside the list (API callers) get an ordinary random token.
+  const row = addBill(s, makeBill(rng(seed), now, store, seq), "api", now, known >= 0 ? simToken(seed, now.getTime(), seq, known) : undefined);
   save();
   return row;
 }

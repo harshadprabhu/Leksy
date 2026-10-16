@@ -127,7 +127,7 @@ describe("rich landing blocks", () => {
     expect(html).toContain('href="https://brand.example.com/offer"');
     expect(html).not.toContain("javascript:");
     expect(html).not.toContain("red;x:y");
-    expect(html).toContain('<img src="https://cdn.example.com/b.jpg"');
+    expect(html).toContain('<img src="https://cdn.example.com/b.jpg" alt="Picture" loading="lazy"');
     expect(html.match(/<i( class="on")?><\/i>/g)).toHaveLength(3);
   });
   it("draws social icons per network and drops unsafe links", () => {
