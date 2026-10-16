@@ -221,8 +221,8 @@ export default function Insights() {
                     </div>
                     <div className="row" style={{ alignItems: "baseline" }}>
                       <span className="kpi"><span className="v">{inr(india.value)}</span></span>
-                      <span className={`badge ${india.wowPct != null && india.wowPct >= 0 ? "good" : "bad"}`}>{delta(india.wowPct)} WoW</span>
-                      <span className={`badge ${india.yoyPct != null && india.yoyPct >= 0 ? "good" : "bad"}`}>{delta(india.yoyPct)} YoY</span>
+                      <span className={`badge ${india.wowPct != null && india.wowPct >= 0 ? "good" : "bad"}`}>{delta(india.wowPct)} vs wk of {new Date(`${india.lastWeekOf}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" })}</span>
+                      <span className={`badge ${india.yoyPct != null && india.yoyPct >= 0 ? "good" : "bad"}`}>{delta(india.yoyPct)} vs last year</span>
                     </div>
                     <table className="t">
                       <tbody>

@@ -14,6 +14,11 @@ export interface DayRow {
   promoters: number;
   detractors: number;
   npsCount: number;
+  /** Bills sent to customers and opened by them (optional; dashboard funnel). */
+  sent?: number;
+  opened?: number;
+  /** Responses rated 3 or lower (base for complaint themes). */
+  low?: number;
 }
 
 export interface StoreInfo {
@@ -22,6 +27,8 @@ export interface StoreInfo {
   city?: string;
   /** North/South/East/West; inferred from the city when missing. */
   region?: string;
+  /** City tier (1 = metro, 2 = large city). */
+  tier?: 1 | 2;
 }
 
 export interface StaffRow {
@@ -42,8 +49,10 @@ export interface Dataset {
   /** Last `detailDays` days only (bill-level breakdowns). */
   detailDays: number;
   staff: StaffRow[];
-  categories: { category: string; revenue: number; units: number }[];
-  themes: { option: string; count: number }[];
+  /** Last `detailDays` days, per store when `store` is set. */
+  categories: { store?: string; category: string; revenue: number; units: number }[];
+  /** Complaint mentions, last `detailDays` days, per store when `store` is set. */
+  themes: { store?: string; option: string; count: number }[];
   goldRate?: { date: string; rate: number }[];
 }
 
@@ -89,7 +98,8 @@ export function totals(rows: DayRow[]): Totals {
 }
 
 export function inRange(ds: Dataset, r: Range, stores?: string[]) {
-  return ds.days.filter((d) => d.date >= r.from && d.date <= r.to && (!stores?.length || stores.includes(d.store)));
+  const only = stores?.length ? new Set(stores) : null;
+  return ds.days.filter((d) => d.date >= r.from && d.date <= r.to && (!only || only.has(d.store)));
 }
 
 /** Sum rows by date (all stores together). */
@@ -116,3 +126,72 @@ export const inr = (n: number) => {
   return `₹${Math.round(n).toLocaleString("en-IN")}`;
 };
 export const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+
+const EMPTY = () => ({ revenue: 0, bills: 0, ratingSum: 0, ratingCount: 0, promoters: 0, detractors: 0, npsCount: 0 });
+
+/**
+ * One pass over the days: totals per group (store, region, tier, city…).
+ * `key` returns the group for a store code, or null to skip it.
+ */
+export function groupTotals(ds: Dataset, r: Range, key: (store: string) => string | null): Map<string, Totals> {
+  const acc = new Map<string, ReturnType<typeof EMPTY>>();
+  const cache = new Map<string, string | null>();
+  for (const d of ds.days) {
+    if (d.date < r.from || d.date > r.to) continue;
+    let k = cache.get(d.store);
+    if (k === undefined) {
+      k = key(d.store);
+      cache.set(d.store, k);
+    }
+    if (k === null) continue;
+    const a = acc.get(k) ?? EMPTY();
+    a.revenue += d.revenue;
+    a.bills += d.bills;
+    a.ratingSum += d.ratingSum;
+    a.ratingCount += d.ratingCount;
+    a.promoters += d.promoters;
+    a.detractors += d.detractors;
+    a.npsCount += d.npsCount;
+    acc.set(k, a);
+  }
+  const out = new Map<string, Totals>();
+  for (const [k, t] of acc) {
+    out.set(k, {
+      revenue: t.revenue,
+      bills: t.bills,
+      abv: t.bills ? t.revenue / t.bills : null,
+      rating: t.ratingCount ? t.ratingSum / t.ratingCount : null,
+      responses: t.ratingCount,
+      nps: t.npsCount ? (100 * (t.promoters - t.detractors)) / t.npsCount : null,
+    });
+  }
+  return out;
+}
+
+/** Category totals for a set of stores (all when empty), largest first. */
+export function categoriesFor(ds: Dataset, stores?: string[]) {
+  const only = stores?.length ? new Set(stores) : null;
+  const m = new Map<string, { category: string; revenue: number; units: number }>();
+  for (const c of ds.categories) {
+    if (only && c.store && !only.has(c.store)) continue;
+    const a = m.get(c.category) ?? { category: c.category, revenue: 0, units: 0 };
+    a.revenue += c.revenue;
+    a.units += c.units;
+    m.set(c.category, a);
+  }
+  return [...m.values()].sort((a, b) => b.revenue - a.revenue || a.category.localeCompare(b.category));
+}
+
+/** Complaint themes for a set of stores (all when empty), most mentioned first. */
+export function themesFor(ds: Dataset, stores?: string[]) {
+  const only = stores?.length ? new Set(stores) : null;
+  const m = new Map<string, number>();
+  for (const t of ds.themes) {
+    if (only && t.store && !only.has(t.store)) continue;
+    m.set(t.option, (m.get(t.option) ?? 0) + t.count);
+  }
+  return [...m].map(([option, count]) => ({ option, count })).sort((a, b) => b.count - a.count || a.option.localeCompare(b.option));
+}
+
+/** The window the bill-level breakdowns (staff, categories, complaints) cover. */
+export const detailRange = (ds: Dataset): Range => ({ from: addDays(ds.asOf, -(ds.detailDays - 1)), to: ds.asOf, label: `last ${ds.detailDays} days` });

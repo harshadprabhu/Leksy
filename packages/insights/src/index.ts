@@ -6,3 +6,6 @@ export * from "./share.js";
 export * from "./seasons.js";
 export * from "./deck.js";
 export * from "./simulate.js";
+export * from "./network.js";
+export * from "./demodata.js";
+export * from "./guard.js";

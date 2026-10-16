@@ -67,7 +67,7 @@ describe("answers", () => {
     const st = ask("Compare stores by revenue", ds);
     expect(st.table!.rows[0]![0]).toBe("Aurum Indiranagar");
     const h = ask("Which store has the lowest happiness?", ds);
-    expect(h.summary.join(" ")).toContain("Least happy: Aurum Bandra");
+    expect(h.summary.join(" ")).toContain("Least happy (min 10 ratings): Aurum Bandra");
     expect(preRead(ds).map((s) => s.heading)).toContain("Recommended actions");
   });
 });

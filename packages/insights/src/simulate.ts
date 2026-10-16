@@ -42,10 +42,17 @@ export function simulateHistory(opts: { stores: StoreInfo[]; from: string; toExc
       const base = (opts.dailyBase[st.code] ?? 150000) / Math.pow(1.12, yearsBack);
       const revenue = Math.round(base * festival * wedding * weekend * (0.82 + rand() * 0.36));
       const bills = Math.max(1, Math.round(revenue / (95000 + rand() * 30000)));
-      const responses = Math.round(bills * 0.35 * (0.6 + rand() * 0.8));
+      // Random rounding keeps small stores' expected response rate (35%) instead of rounding it to zero.
+      const responses = Math.floor(bills * 0.35 * (0.6 + rand() * 0.8) + rand());
       const m = (opts.mood?.[st.code] ?? 4) - (festival > 1.5 ? 0.3 : 0);
       const ratingSum = Math.round(responses * Math.min(5, Math.max(1, m + (rand() - 0.5) * 0.6)));
-      out.push({ date, store: st.code, revenue, bills, ratingSum, ratingCount: responses, promoters: Math.round(responses * Math.max(0, (m - 3) / 2) * 0.8), detractors: Math.round(responses * Math.max(0, (4 - m) / 3) * 0.6), npsCount: responses });
+      const sent = Math.round(bills * 0.97);
+      const opened = Math.round(sent * (0.66 + rand() * 0.16));
+      // Ratings of 3 or lower: as many as the mood suggests, but always possible
+      // given the rating sum (L low ratings fit only if 4r-3L ≤ sum ≤ 5r-2L).
+      const want = Math.round(responses * Math.max(0.03, (4.4 - m) / 3.5));
+      const low = Math.max(0, Math.ceil((4 * responses - ratingSum) / 3), Math.min(want, responses, Math.floor((5 * responses - ratingSum) / 2)));
+      out.push({ date, store: st.code, revenue, bills, ratingSum, ratingCount: responses, promoters: Math.round(responses * Math.max(0, (m - 3) / 2) * 0.8), detractors: Math.round(responses * Math.max(0, (4 - m) / 3) * 0.6), npsCount: responses, sent, opened, low });
     }
   }
   return out;

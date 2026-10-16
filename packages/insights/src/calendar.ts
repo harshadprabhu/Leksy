@@ -105,10 +105,10 @@ export function festivalsBetween(from: string, to: string, list: Festival[] = FE
 const CITY_REGION: Record<string, Region> = Object.fromEntries(
   (
     [
-      ["North", "delhi,new delhi,gurugram,gurgaon,noida,chandigarh,jaipur,lucknow,ludhiana,amritsar,dehradun,kanpur,agra,varanasi,jammu"],
-      ["South", "bengaluru,bangalore,chennai,hyderabad,kochi,cochin,coimbatore,madurai,visakhapatnam,vizag,mysuru,mysore,thiruvananthapuram,trivandrum,vijayawada,thrissur"],
-      ["East", "kolkata,calcutta,bhubaneswar,guwahati,patna,ranchi,siliguri,cuttack"],
-      ["West", "mumbai,pune,ahmedabad,surat,vadodara,nagpur,goa,panaji,indore,rajkot,nashik,thane"],
+      ["North", "delhi,new delhi,gurugram,gurgaon,noida,ghaziabad,faridabad,chandigarh,jaipur,lucknow,ludhiana,amritsar,dehradun,kanpur,agra,varanasi,jammu,jodhpur,udaipur,meerut,prayagraj"],
+      ["South", "bengaluru,bangalore,chennai,hyderabad,secunderabad,kochi,cochin,coimbatore,madurai,visakhapatnam,vizag,mysuru,mysore,thiruvananthapuram,trivandrum,vijayawada,thrissur,mangaluru,mangalore,hubballi,tiruchirappalli,salem,warangal,guntur,kozhikode"],
+      ["East", "kolkata,calcutta,howrah,bhubaneswar,guwahati,patna,ranchi,siliguri,cuttack,jamshedpur,durgapur"],
+      ["West", "mumbai,navi mumbai,thane,pune,ahmedabad,surat,vadodara,nagpur,goa,panaji,indore,bhopal,raipur,rajkot,nashik,aurangabad,kolhapur"],
     ] as const
   ).flatMap(([region, cities]) => cities.split(",").map((c) => [c, region as Region])),
 );

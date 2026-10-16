@@ -61,3 +61,20 @@ Importing a company's own `.potx` master directly is planned for the server vers
 ## Regional calendar
 
 `packages/insights/src/calendar.ts` holds national moments (Akshaya Tritiya, Dhanteras, Diwali, wedding season) and regional ones: North (Lohri, Raksha Bandhan, Dussehra, Karva Chauth), South (Pongal, Ugadi, Onam), East (Poila Baisakh, Durga Puja), West (Gudi Padwa, Ganesh Chaturthi, Navratri), each with a playbook. Stores get their region from the city (or set it explicitly). Each region's forecast uses only its own festivals plus national ones. Lunar dates are approximate; verify with a local panchang.
+
+## Accuracy at national scale
+
+The engine is tested against a 400-store network (tier 1 and tier 2 cities, all four regions) in `packages/insights/src/accuracy.test.ts`. Every figure is recomputed by brute force and must match what the page shows:
+
+- sales, bills and average bill for 11 periods × 7 scopes (city, region, tier, region + tier);
+- every row of store, region, tier and city rankings; group totals add up to the national total;
+- happiness, NPS, least- and most-happy store, and complaint themes counted only in the stores asked about;
+- category revenue (bill totals shared over items, so it adds up to store revenue to the paisa) and staff totals (add up exactly to each store);
+- next week by region (All India = sum of regions), forecasts, festival dates and decision deadlines;
+- the deck's figures, and the number guard that hides local-model wording containing any figure the engine did not compute.
+
+Comparisons use the calendar: this week vs the same weekdays last week, this month vs the same days last month, this year vs the same dates last year, and every comparison names its dates. Breakdowns (staff, categories, complaints) cover the last 30 days and say so when a question asks about another period. Stores need at least 10 ratings before they are ranked on happiness.
+
+## Brand kit
+
+Settings → Brand kit sets the brand name, logo (PNG, JPG or SVG) and colours once and applies them to every bill template (as a new published version) and to the Insights deck. In the public demo it is stored only in the browser, so a pilot brand's assets are never published.

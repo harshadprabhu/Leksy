@@ -8,13 +8,13 @@
 import { BillSchema, validateBill, type Bill } from "@leksy/bill-schema";
 import { applyMapping, samplePaths, suggestMapping, type Mapping } from "@leksy/mapper";
 import { cleanAnswers, MISSION_HAPPINESS, SurveySchema, type Survey } from "@leksy/survey";
-import { simulateHistory, type Dataset, type DayRow } from "@leksy/insights";
+import { buildDemoDataset, buildNetwork, staffFor, storeProfile, themesFor, THEMES, type Dataset, type SampleBill } from "@leksy/insights";
 import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type Condition, type Template } from "@leksy/template-engine";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const KEY = "lx_demo_v2"; // v2: five stores across North, South, East and West
+const KEY = "lx_demo_v3"; // v3: a 400-store national network (tier 1 and tier 2 cities)
 const DAY = 864e5;
 
 interface DemoBill {
@@ -82,29 +82,30 @@ const token = () => {
 };
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-const STORES = [
-  { code: "BLR-INDIRANAGAR", name: "Aurum & Co. Indiranagar", city: "Bengaluru", address: "100 Feet Road, Indiranagar", managerName: "Priya N", managerPhone: "+919800000001", gstin: "29ABCDE1234F1Z5" },
-  { code: "MUM-BANDRA", name: "Aurum & Co. Bandra", city: "Mumbai", address: "Linking Road, Bandra West", managerName: "Arjun S", managerPhone: "+919800000002", gstin: "27ABCDE1234F1Z9" },
-  { code: "DEL-KHAN-MARKET", name: "Aurum & Co. Khan Market", city: "New Delhi", address: "Middle Lane, Khan Market", managerName: "Neha K", managerPhone: "+919800000003", gstin: "07ABCDE1234F1Z2" },
-  { code: "HYD-JUBILEE", name: "Aurum & Co. Jubilee Hills", city: "Hyderabad", address: "Road No. 36, Jubilee Hills", managerName: "Kiran R", managerPhone: "+919800000004", gstin: "36ABCDE1234F1Z7" },
-  { code: "KOL-PARK-STREET", name: "Aurum & Co. Park Street", city: "Kolkata", address: "Park Street", managerName: "Sourav D", managerPhone: "+919800000005", gstin: "19ABCDE1234F1Z3" },
-];
-const STAFF = [
-  { id: "S-114", name: "Rahul" },
-  { id: "S-207", name: "Fatima" },
-  { id: "S-311", name: "Vikram" },
-  { id: "S-402", name: "Ananya" },
-  { id: "S-518", name: "Joseph" },
-];
+/** Fictional national network: 400 stores over tier-1 metros and tier-2 cities. */
+const STATE: Record<string, string> = { North: "07", South: "29", East: "19", West: "27" };
+export const STORES = buildNetwork("", 400).map((st, i) => ({
+  code: st.code,
+  name: st.name,
+  city: st.city!,
+  region: st.region,
+  tier: st.tier,
+  address: `${st.name.replace(`${st.city} `, "")}, ${st.city}`,
+  managerName: `${["Priya", "Arjun", "Neha", "Kiran", "Sourav", "Meera", "Rahul", "Divya"][i % 8]} ${"NSKRDMPG"[(i * 3) % 8]}`,
+  managerPhone: `+9198${String(10000000 + i).slice(-8)}`,
+  gstin: `${STATE[st.region ?? ""] ?? "27"}ABCDE1234F1Z${(i % 9) + 1}`,
+}));
 const NAMES = ["Meera Iyer", "Kabir Shah", "Aisha Khan", "Rohan Mehta", "Diya Kapoor", "Arjun Rao", "Sana Ali", "Ishaan Gupta", "Tara Menon", "Dev Patel", "Nisha Reddy", "Aditya Joshi", "Zoya Siddiqui", "Karan Malhotra", "Pooja Nair"];
+// Categories match the Insights category list, so bills and analytics line up.
 const CATALOG = [
   { name: "Temple Necklace", category: "Necklace", metal: "Gold", purity: "22K", wt: 24.6, rate: 7120, making: 14220, cert: "BIS_HALLMARK" },
   { name: "Solitaire Studs", category: "Earrings", metal: "Gold", purity: "18K", wt: 3.2, rate: 0, making: 0, price: 96500, stone: 0.5, cert: "IGI" },
   { name: "Kundan Bangles (pair)", category: "Bangles", metal: "Gold", purity: "22K", wt: 32.4, rate: 7120, making: 18900, cert: "BIS_HALLMARK" },
   { name: "Diamond Tennis Bracelet", category: "Bracelet", metal: "Gold", purity: "18K", wt: 9.8, rate: 0, making: 0, price: 245000, stone: 2.1, cert: "GIA" },
-  { name: "Gold Coin 10g", category: "Coin", metal: "Gold", purity: "24K", wt: 10, rate: 7768, making: 450, cert: "BIS_HALLMARK" },
-  { name: "Mangalsutra", category: "Necklace", metal: "Gold", purity: "22K", wt: 12.2, rate: 7120, making: 8200, cert: "BIS_HALLMARK" },
-  { name: "Platinum Band", category: "Ring", metal: "Platinum", purity: "PT950", wt: 6.1, rate: 3350, making: 4100, cert: "WARRANTY" },
+  { name: "Gold Coin 10g", category: "Coins", metal: "Gold", purity: "24K", wt: 10, rate: 7768, making: 450, cert: "BIS_HALLMARK" },
+  { name: "Mangalsutra", category: "Mangalsutra", metal: "Gold", purity: "22K", wt: 12.2, rate: 7120, making: 8200, cert: "BIS_HALLMARK" },
+  { name: "Diamond Pendant", category: "Pendant", metal: "Gold", purity: "18K", wt: 2.8, rate: 0, making: 0, price: 58500, stone: 0.3, cert: "IGI" },
+  { name: "Platinum Band", category: "Rings", metal: "Platinum", purity: "PT950", wt: 6.1, rate: 3350, making: 4100, cert: "WARRANTY" },
 ];
 const HUID = () => Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]).join("");
 
@@ -139,7 +140,8 @@ function makeBill(rand: () => number, at: Date, storeCode: string, n: number): B
   const half = r2(taxable * 0.015);
   const rounded = Math.round(taxable + half * 2);
   const name = NAMES[Math.floor(rand() * NAMES.length)]!;
-  const staff = STAFF[Math.floor(rand() * STAFF.length)]!;
+  const team = staffFor(storeCode);
+  const staff = team[Math.floor(rand() * team.length)]!;
   const ist = new Date(at.getTime() + 5.5 * 3600e3).toISOString().slice(0, 19);
   return BillSchema.parse({
     invoice_no: `AUR-${storeCode.slice(0, 3)}-${at.getUTCFullYear()}-${String(n).padStart(5, "0")}`,
@@ -206,26 +208,27 @@ function seed(): DemoState {
     surveys: defaultSurveys(),
     seq: 1000,
   };
-  // ~120 bills over 30 days; Mumbai has slow billing, Delhi shines.
-  const mood: Record<string, number> = { "BLR-INDIRANAGAR": 4.2, "MUM-BANDRA": 3.0, "DEL-KHAN-MARKET": 4.6, "HYD-JUBILEE": 3.9, "KOL-PARK-STREET": 4.1 };
+  // ~600 itemised bills over 30 days across the network. Each store's customer
+  // mood comes from the same profile that drives the generated history.
+  const slow = new Set(["Mumbai", "Lucknow", "Patna"]);
   for (let d = 29; d >= 0; d--) {
-    const perDay = 2 + Math.floor(rand() * 5);
+    const perDay = 16 + Math.floor(rand() * 9);
     for (let k = 0; k < perDay; k++) {
-      const store = STORES[Math.floor(rand() * STORES.length)]!.code;
+      const st = STORES[Math.floor(rand() * STORES.length)]!;
       const at = new Date(now - d * DAY - Math.floor(rand() * 9) * 3600e3);
       if (at.getTime() > now) continue;
-      const bill = makeBill(rand, at, store, ++state.seq);
+      const bill = makeBill(rand, at, st.code, ++state.seq);
       const row = addBill(state, bill, "api", at);
       if (rand() < 0.74) {
         row.openedAt = new Date(at.getTime() + (5 + rand() * 120) * 60e3).toISOString();
         row.status = "delivered";
         if (rand() < 0.48) {
-          const base = mood[store]! + (rand() - 0.5) * 2.2;
+          const base = storeProfile(st).mood + (rand() - 0.5) * 2.2;
           const rating = Math.max(1, Math.min(5, Math.round(base)));
-          const improve = rating <= 3 ? pickSome(rand, store === "MUM-BANDRA" ? ["Waiting time", "Waiting time", "Billing", "Staff help"] : ["Store ambience", "Pricing", "Product range", "Staff help"]) : undefined;
+          const improve = rating <= 3 ? pickSome(rand, slow.has(st.city) ? ["Waiting time", "Waiting time", "Billing", "Staff help"] : THEMES.filter((t) => t !== "Waiting time")) : undefined;
           const loved = rating >= 4 ? pickSome(rand, ["Staff help", "Product range", "Store ambience", "Quick billing"]) : undefined;
           const answers: Record<string, unknown> = { overall: rating, nps: Math.max(0, Math.min(10, rating * 2 + Math.round(rand() * 2 - 1))), ...(improve ? { improve } : {}), ...(loved ? { loved } : {}) };
-          if (rating <= 2 && rand() < 0.6) answers.comment = store === "MUM-BANDRA" ? "Waited almost 25 minutes at the billing counter." : "The staff seemed busy and didn't explain the making charges.";
+          if (rating <= 2 && rand() < 0.6) answers.comment = slow.has(st.city) ? "Waited almost 25 minutes at the billing counter." : "The staff seemed busy and didn't explain the making charges.";
           const fb = feedbackRow(state, row, rating, answers, new Date(new Date(row.openedAt).getTime() + 3 * 60e3));
           if (fb.ticketStatus === "open" && d > 2) {
             fb.ticketStatus = rand() < 0.7 ? "resolved" : "open";
@@ -393,7 +396,7 @@ export function hasFeedback(bill: DemoBill) {
 export function simulateSale(storeCode?: string): DemoBill {
   const s = load();
   const rand = rng(Date.now() % 100000);
-  const store = storeCode ?? STORES[Math.floor(Math.random() * STORES.length)]!.code;
+  const store = storeCode ?? s.stores[Math.floor(Math.random() * s.stores.length)]!.code;
   const row = addBill(s, makeBill(rand, new Date(), store, ++s.seq), "api");
   save();
   return row;
@@ -401,153 +404,107 @@ export function simulateSale(storeCode?: string): DemoBill {
 
 // ---------- analytics (same shape as the server's summary) ----------
 
-function summary(s: DemoState, from: Date, to: Date) {
-  const inRange = s.bills.filter((b) => {
-    const t = new Date(b.issuedAt).getTime();
-    return t >= from.getTime() && t <= to.getTime();
+/**
+ * Dashboard numbers come from the same daily facts as Insights (generated network
+ * history plus every itemised bill), so the two pages always agree.
+ */
+function summary(s: DemoState, fromDay: string, toDay: string) {
+  const ds = demoDataset(s);
+  type Acc = { bills: number; revenue: number; sent: number; opened: number; ratingSum: number; ratingCount: number; promoters: number; detractors: number; npsCount: number };
+  const blank = (): Acc => ({ bills: 0, revenue: 0, sent: 0, opened: 0, ratingSum: 0, ratingCount: 0, promoters: 0, detractors: 0, npsCount: 0 });
+  const add = (a: Acc, d: Dataset["days"][number]) => {
+    a.bills += d.bills;
+    a.revenue += d.revenue;
+    a.sent += d.sent ?? 0;
+    a.opened += d.opened ?? 0;
+    a.ratingSum += d.ratingSum;
+    a.ratingCount += d.ratingCount;
+    a.promoters += d.promoters;
+    a.detractors += d.detractors;
+    a.npsCount += d.npsCount;
+  };
+  const all = blank();
+  const byStore = new Map<string, Acc>();
+  const byDay = new Map<string, Acc>();
+  for (const d of ds.days) {
+    if (d.date < fromDay || d.date > toDay) continue;
+    add(all, d);
+    add(byStore.get(d.store) ?? byStore.set(d.store, blank()).get(d.store)!, d);
+    add(byDay.get(d.date) ?? byDay.set(d.date, blank()).get(d.date)!, d);
+  }
+  const rating = (a: Acc) => (a.ratingCount ? a.ratingSum / a.ratingCount : null);
+  const nps = (a: Acc) => (a.npsCount ? (100 * (a.promoters - a.detractors)) / a.npsCount : null);
+  const names = new Map(s.stores.map((x) => [x.code, x.name]));
+  const fromT = new Date(`${fromDay}T00:00:00+05:30`).getTime();
+  const toT = new Date(`${toDay}T23:59:59.999+05:30`).getTime();
+  const fb = s.feedback.filter((f) => {
+    const t = new Date(f.createdAt).getTime();
+    return t >= fromT && t <= toT;
   });
-  const fbBy = new Map(s.feedback.map((f) => [f.billId, f]));
-  const agg = (bills: DemoBill[]) => {
-    const fbs = bills.map((b) => fbBy.get(b.id)).filter(Boolean) as any[];
-    const npsList = fbs.filter((f) => f.nps != null).map((f) => f.nps as number);
-    return {
-      bills: bills.length,
-      opened: bills.filter((b) => b.openedAt).length,
-      responses: fbs.length,
-      avgRating: fbs.length ? r2(fbs.reduce((a, f) => a + f.rating, 0) / fbs.length) : null,
-      nps: npsList.length ? Math.round((1000 * (npsList.filter((n) => n >= 9).length - npsList.filter((n) => n <= 6).length)) / npsList.length) / 10 : null,
-      fbs,
-    };
-  };
-  const all = agg(inRange);
-  const istDay = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10);
-  const group = <K,>(xs: DemoBill[], key: (b: DemoBill) => K) => {
-    const m = new Map<K, DemoBill[]>();
-    for (const b of xs) m.set(key(b), [...(m.get(key(b)) ?? []), b]);
-    return m;
-  };
-  const themes = new Map<string, number>();
-  for (const f of all.fbs) for (const o of (f.answers.improve as string[] | undefined) ?? []) themes.set(o, (themes.get(o) ?? 0) + 1);
+  const detailFrom = addDaysIso(ds.asOf, -(ds.detailDays - 1));
   return {
     bills: all.bills,
-    sent: inRange.filter((b) => ["sent", "delivered"].includes(b.status)).length,
+    sent: all.sent,
     opened: all.opened,
-    responses: all.responses,
-    avgRating: all.avgRating,
-    nps: all.nps,
-    openTickets: all.fbs.filter((f) => ["open", "in_progress"].includes(f.ticketStatus)).length,
-    revenue: inRange.reduce((a, b) => a + Number(b.total), 0),
-    byStore: [...group(inRange, (b) => b.storeCode)]
-      .map(([store, bs]) => {
-        const a = agg(bs);
-        return { store, bills: a.bills, opened: a.opened, responses: a.responses, avgRating: a.avgRating, nps: a.nps };
-      })
-      .sort((x, y) => (x.avgRating ?? 99) - (y.avgRating ?? 99)),
-    byDay: [...group(inRange, (b) => istDay(b.issuedAt))]
-      .map(([day, bs]) => {
-        const a = agg(bs);
-        return { day, bills: a.bills, opened: a.opened, responses: a.responses, avgRating: a.avgRating };
-      })
-      .sort((x, y) => x.day.localeCompare(y.day)),
-    themes: [...themes].map(([option, count]) => ({ option, count })).sort((a, b) => b.count - a.count),
+    responses: all.ratingCount,
+    avgRating: rating(all),
+    nps: nps(all),
+    openTickets: fb.filter((f) => ["open", "in_progress"].includes(f.ticketStatus)).length,
+    revenue: all.revenue,
+    stores: s.stores.length,
+    byStore: [...byStore]
+      .map(([store, a]) => ({ store, name: names.get(store) ?? store, bills: a.bills, opened: a.opened, sent: a.sent, responses: a.ratingCount, avgRating: rating(a), nps: nps(a) }))
+      // Least happy first, among stores with enough ratings to judge.
+      .sort((x, y) => Number(y.responses >= 10) - Number(x.responses >= 10) || (x.avgRating ?? 99) - (y.avgRating ?? 99) || y.responses - x.responses),
+    byDay: [...byDay].map(([day, a]) => ({ day, bills: a.bills, opened: a.opened, responses: a.ratingCount, avgRating: rating(a) })).sort((x, y) => x.day.localeCompare(y.day)),
+    themes: themesFor(ds),
+    themesWindow: { from: detailFrom, to: ds.asOf },
   };
 }
 
 // ---------- Insights dataset ----------
 
 const istDate = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10);
+const addDaysIso = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
+
+/** Every itemised bill in the demo, in the shape the dataset builder adds on top of the history. */
+function samplesOf(s: DemoState): SampleBill[] {
+  const fbBy = new Map(s.feedback.map((f) => [f.billId, f]));
+  return s.bills.map((b) => {
+    const f = fbBy.get(b.id);
+    return {
+      date: istDate(b.issuedAt),
+      store: b.storeCode,
+      total: Number(b.total),
+      sent: ["sent", "delivered"].includes(b.status),
+      opened: !!b.openedAt,
+      ...(b.data.staff?.id ? { staff: { id: b.data.staff.id, name: b.data.staff.name ?? b.data.staff.id } } : {}),
+      items: b.data.items.map((it) => ({ category: it.category ?? "Other", amount: it.qty * it.unit_price - it.discount })),
+      ...(f ? { feedback: { rating: f.rating, nps: f.nps, improve: (f.answers.improve as string[] | undefined) ?? [] } } : {}),
+    };
+  });
+}
+
+let memo: { key: string; ds: Dataset } | null = null;
 
 /**
- * Daily aggregates for Insights: two years of generated store history (weekends,
- * wedding season, 12% yearly growth, national and regional festivals) followed by
- * the demo's real bills for the last 30 days.
+ * Daily aggregates for Insights and the dashboard: two years of generated history
+ * for every store (weekends, wedding season, growth, national and regional
+ * festivals) with every itemised demo bill added to its day. Rebuilt only when
+ * bills, feedback, stores or the date change.
  */
-function demoDataset(s: DemoState): Dataset {
+export function demoDataset(s: DemoState): Dataset {
   const asOf = istDate(new Date().toISOString());
-  const detailFrom = new Date(Date.parse(`${asOf}T00:00:00Z`) - 29 * DAY).toISOString().slice(0, 10);
-  const fbBy = new Map(s.feedback.map((f) => [f.billId, f]));
-  const days: DayRow[] = [];
-
-  // Real recent bills, by day and store.
-  const recent = new Map<string, DayRow>();
-  for (const b of s.bills) {
-    const date = istDate(b.issuedAt);
-    if (date < detailFrom) continue;
-    const k = `${date}|${b.storeCode}`;
-    const r = recent.get(k) ?? { date, store: b.storeCode, revenue: 0, bills: 0, ratingSum: 0, ratingCount: 0, promoters: 0, detractors: 0, npsCount: 0 };
-    r.revenue += Number(b.total);
-    r.bills += 1;
-    const f = fbBy.get(b.id);
-    if (f) {
-      r.ratingSum += f.rating;
-      r.ratingCount += 1;
-      if (f.nps != null) {
-        r.npsCount += 1;
-        if (f.nps >= 9) r.promoters += 1;
-        if (f.nps <= 6) r.detractors += 1;
-      }
-    }
-    recent.set(k, r);
-  }
-  // Each store's recent daily average anchors the generated history (regional festivals included).
-  const dailyBase: Record<string, number> = {};
-  for (const st of s.stores) {
-    const rows = [...recent.values()].filter((r) => r.store === st.code);
-    dailyBase[st.code] = Math.max(80000, rows.reduce((a, r) => a + r.revenue, 0) / 30);
-  }
-  days.push(
-    ...simulateHistory({
-      stores: s.stores.map((x) => ({ code: x.code, name: x.name, city: x.city })),
-      from: new Date(Date.parse(`${asOf}T00:00:00Z`) - 760 * DAY).toISOString().slice(0, 10),
-      toExclusive: detailFrom,
-      asOf,
-      dailyBase,
-      mood: { "BLR-INDIRANAGAR": 4.2, "MUM-BANDRA": 3.1, "DEL-KHAN-MARKET": 4.6, "HYD-JUBILEE": 3.9, "KOL-PARK-STREET": 4.1 },
-    }),
-  );
-  days.push(...recent.values());
-
-  // Bill-level breakdowns for the last 30 days.
-  const staff = new Map<string, Dataset["staff"][number]>();
-  const cats = new Map<string, { category: string; revenue: number; units: number }>();
-  for (const b of s.bills) {
-    if (istDate(b.issuedAt) < detailFrom) continue;
-    const st = b.data.staff;
-    if (st) {
-      const k = `${st.id}|${b.storeCode}`;
-      const row = staff.get(k) ?? { id: st.id, name: st.name ?? st.id, store: b.storeCode, bills: 0, revenue: 0, ratingSum: 0, ratingCount: 0 };
-      row.bills += 1;
-      row.revenue += Number(b.total);
-      const f = fbBy.get(b.id);
-      if (f) {
-        row.ratingSum += f.rating;
-        row.ratingCount += 1;
-      }
-      staff.set(k, row);
-    }
-    for (const it of b.data.items) {
-      const c = it.category ?? "Other";
-      const row = cats.get(c) ?? { category: c, revenue: 0, units: 0 };
-      row.revenue += it.qty * it.unit_price - it.discount;
-      row.units += it.qty;
-      cats.set(c, row);
-    }
-  }
-  const themes = new Map<string, number>();
-  for (const f of s.feedback) {
-    if (istDate(f.createdAt) < detailFrom) continue;
-    for (const o of (f.answers.improve as string[] | undefined) ?? []) themes.set(o, (themes.get(o) ?? 0) + 1);
-  }
-  return {
+  const key = `${asOf}|${s.bills.length}|${s.feedback.length}|${s.stores.length}|${s.brand.name}`;
+  if (memo?.key === key) return memo.ds;
+  const ds = buildDemoDataset({
     brand: s.brand.name,
     asOf,
-    stores: s.stores.map((x) => ({ code: x.code, name: x.name, city: x.city })),
-    days,
-    detailDays: 30,
-    staff: [...staff.values()],
-    categories: [...cats.values()],
-    themes: [...themes].map(([option, count]) => ({ option, count })).sort((a, b) => b.count - a.count),
-  };
+    stores: s.stores.map((x) => ({ code: x.code, name: x.name, city: x.city, ...(x.region ? { region: x.region } : {}), ...(x.tier ? { tier: x.tier } : {}) })),
+    samples: samplesOf(s),
+  });
+  memo = { key, ds };
+  return ds;
 }
 
 // ---------- request router ----------
@@ -579,6 +536,7 @@ export async function demoApi<T>(path: string, method: string, body: any): Promi
   const q = url.searchParams;
   const seg = p.split("/").filter(Boolean); // ["v1", "bills", ":id", ...]
   const out = route(s, method, seg, q, body);
+  if (seg[1] === "insights") return out as T; // read-only and large: no copy, no save
   save();
   return structuredClone(out) as T;
 }
@@ -592,9 +550,9 @@ function route(s: DemoState, method: string, seg: string[], q: URLSearchParams, 
   if (res === "brand" && M === "PUT") return Object.assign(s.brand, body);
 
   if (res === "analytics") {
-    const to = q.get("to") ? new Date(`${q.get("to")}T23:59:59.999+05:30`) : new Date();
-    const from = q.get("from") ? new Date(`${q.get("from")}T00:00:00+05:30`) : new Date(to.getTime() - 30 * DAY);
-    return summary(s, from, to);
+    const toDay = q.get("to") ?? istDate(new Date().toISOString());
+    const fromDay = q.get("from") ?? addDaysIso(toDay, -29);
+    return summary(s, fromDay, toDay);
   }
 
   if (res === "bills") {
@@ -615,12 +573,14 @@ function route(s: DemoState, method: string, seg: string[], q: URLSearchParams, 
     }
     const term = (q.get("q") ?? "").toLowerCase();
     const fbBy = new Map(s.feedback.map((f) => [f.billId, f]));
+    const names = new Map(s.stores.map((x) => [x.code, x.name]));
+    const matched = s.bills.filter((b) => !term || b.invoiceNo.toLowerCase().includes(term) || (b.customerPhone ?? "").includes(term) || b.storeCode.toLowerCase().includes(term) || (names.get(b.storeCode) ?? "").toLowerCase().includes(term));
     return {
-      bills: s.bills
-        .filter((b) => !term || b.invoiceNo.toLowerCase().includes(term) || (b.customerPhone ?? "").includes(term))
+      total: matched.length,
+      bills: matched
         .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
         .slice(0, Number(q.get("limit") ?? 50))
-        .map((b) => ({ ...b, data: undefined, rating: fbBy.get(b.id)?.rating ?? null, url: linksFor(b.token).page })),
+        .map((b) => ({ ...b, data: undefined, storeName: names.get(b.storeCode) ?? b.storeCode, rating: fbBy.get(b.id)?.rating ?? null, url: linksFor(b.token).page })),
     };
   }
 
@@ -715,7 +675,8 @@ function route(s: DemoState, method: string, seg: string[], q: URLSearchParams, 
       return Object.assign(f, body);
     }
     const ticket = q.get("ticket");
-    return { feedback: s.feedback.filter((f) => !ticket || f.ticketStatus === ticket).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, Number(q.get("limit") ?? 50)) };
+    const matched = s.feedback.filter((f) => !ticket || f.ticketStatus === ticket);
+    return { total: matched.length, feedback: matched.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, Number(q.get("limit") ?? 50)) };
   }
 
   if (res === "stores") {

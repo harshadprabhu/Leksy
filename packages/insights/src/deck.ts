@@ -6,8 +6,8 @@
  * document properties, no null chart values, inside-only labels on stacked charts.
  */
 import type * as PptxModule from "pptxgenjs";
-import { REGIONS, type Region } from "./calendar.js";
-import { addDays, inRange, totals, type Dataset } from "./dataset.js";
+import { REGIONS, regionOf, type Region } from "./calendar.js";
+import { addDays, categoriesFor, groupTotals, inRange, themesFor, totals, type Dataset } from "./dataset.js";
 import { forecast, toWeekly } from "./forecast.js";
 import { decisions, nextWeekByRegion, upcomingMoments, type RegionWeek, type SeasonMoment } from "./seasons.js";
 import type { Answer } from "./ask.js";
@@ -117,7 +117,7 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
     if (india) {
       const stats: [string, string, string][] = [
         [money(india.value), `Next week (w/c ${dd(india.week)})`, "FFFFFF"],
-        [pctTxt(india.wowPct), "vs this week", india.wowPct == null ? "FFFFFF" : india.wowPct >= 0 ? "7EE07E" : "FF9A9A"],
+        [pctTxt(india.wowPct), `vs w/c ${dd(india.lastWeekOf)}`, india.wowPct == null ? "FFFFFF" : india.wowPct >= 0 ? "7EE07E" : "FF9A9A"],
         [money(t.revenue), "Last 30 days", "FFFFFF"],
         [t.rating == null ? "–" : `${t.rating.toFixed(1)}★`, "Customer rating", "FFFFFF"],
       ];
@@ -166,8 +166,8 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
     s.addText("All India", { x: 0.8, y: 1.95, w: 3.4, h: 0.35, fontFace: BF, fontSize: 14, color: MUTED, margin: 0, isTextBox: true });
     s.addText(money(india.value), { x: 0.8, y: 2.35, w: 3.4, h: 0.8, fontFace: HF, fontSize: 40, bold: true, color: INK, margin: 0, isTextBox: true });
     s.addText(`80% range ${money(india.low)} – ${money(india.high)}`, { x: 0.8, y: 3.15, w: 3.4, h: 0.35, fontFace: BF, fontSize: 13, color: MUTED, margin: 0, isTextBox: true });
-    chip(s, `${pctTxt(india.wowPct)} WoW`, 0.8, 3.75, pctColor(india.wowPct), 1.55);
-    chip(s, `${pctTxt(india.yoyPct)} YoY`, 2.5, 3.75, pctColor(india.yoyPct), 1.55);
+    chip(s, `${pctTxt(india.wowPct)} vs w/c ${dd(india.lastWeekOf)}`, 0.8, 3.75, pctColor(india.wowPct), 2.05);
+    chip(s, `${pctTxt(india.yoyPct)} YoY`, 2.95, 3.75, pctColor(india.yoyPct), 1.3);
     s.addText(
       [
         { text: "Model error ", options: { color: MUTED } },
@@ -196,7 +196,7 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
       { text: pctTxt(r.yoyPct), options: { color: pctColor(r.yoyPct), bold: true } },
       { text: r.festival ?? "–" },
     ]);
-    s.addTable([["Region", "Forecast", "WoW", "YoY", "Festival in week"].map((h) => ({ text: h, options: { bold: true, color: MUTED } })), ...rows], {
+    s.addTable([["Region", "Forecast", `vs w/c ${dd(india.lastWeekOf)}`, "YoY", "Festival in week"].map((h) => ({ text: h, options: { bold: true, color: MUTED } })), ...rows], {
       x: 4.8, y: 5.1, w: 8.0, colW: [1.3, 1.5, 1.3, 1.3, 2.6], fontFace: BF, fontSize: 12, color: INK, border: { type: "solid", color: LINE, pt: 0.75 }, rowH: 0.3, margin: 0.04,
     });
   }
@@ -244,7 +244,7 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
         [
           { text: wk ? money(wk.value) : "–", options: { bold: true, color: INK, fontSize: 22 } },
           { text: "  next week", options: { color: MUTED, fontSize: 12 } },
-          { text: `\n${pctTxt(wk?.wowPct)} WoW`, options: { color: pctColor(wk?.wowPct), bold: true, fontSize: 12 } },
+          { text: `\n${pctTxt(wk?.wowPct)} vs w/c ${wk ? dd(wk.lastWeekOf) : ""}`, options: { color: pctColor(wk?.wowPct), bold: true, fontSize: 12 } },
         ],
         { x: x + 0.3, y: 2.4, w: w - 0.5, h: 0.85, fontFace: BF, margin: 0, isTextBox: true, valign: "top" },
       );
@@ -317,47 +317,75 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
   }
 
   // ---- 7. Stores ----
+  const curByStore = groupTotals(ds, cur, (c) => c);
+  const prevByStore = groupTotals(ds, prev, (c) => c);
+  const short = (n: string) => n.replace(ds.brand, "").trim() || n;
   {
     const s = pptx.addSlide({ masterName: "CONTENT" });
+    const regionOfCode = new Map(ds.stores.map((st) => [st.code, regionOf(st)]));
     const rows = ds.stores
-      .map((st) => ({ st, cur: totals(inRange(ds, cur, [st.code])), prev: totals(inRange(ds, prev, [st.code])), region: regionsPresent.find((r) => r.stores.includes(st.code))?.region }))
-      .filter((r) => r.cur.bills)
-      .sort((a, b) => b.cur.revenue - a.cur.revenue);
-    title(s, rows[0] ? `${rows[0].st.name} leads with ${money(rows[0].cur.revenue)}` : "Stores", "Stores · last 30 days");
-    const short = (n: string) => n.replace(ds.brand, "").trim() || n;
-    const labels = rows.map((r) => short(r.st.name));
-    const regs = [...new Set(rows.map((r) => r.region ?? "All India"))] as (Region | "All India")[];
-    s.addChart(
-      "bar",
-      regs.map((g) => ({ name: g, labels, values: rows.map((r) => ((r.region ?? "All India") === g ? L(r.cur.revenue) : 0)) })),
-      {
-        x: 0.5, y: 1.6, w: 7.4, h: 5.1, barDir: "bar", barGrouping: "stacked", barGapWidthPct: 50,
-        chartColors: regs.map((g) => REGION_COLOR[g]), showValue: true, dataLabelPosition: "inEnd", dataLabelColor: "FFFFFF", dataLabelFormatCode: '0.0" L";;;',
-        showLegend: true, legendPos: "b", valAxisLabelFormatCode: '0" L"', catAxisOrientation: "maxMin" as "minMax", ...axis,
-      },
-    );
-    s.addTable(
-      [
-        ["Store", "MoM", "Rating", "NPS"].map((h) => ({ text: h, options: { bold: true, color: MUTED } })),
-        ...rows.map((r) => {
-          const mom = ch(r.cur.revenue, r.prev.revenue);
-          return [
-            { text: labels[rows.indexOf(r)]! },
-            { text: pctTxt(mom), options: { color: pctColor(mom), bold: true } },
-            { text: r.cur.rating ? r.cur.rating.toFixed(1) : "–", options: { bold: true, color: r.cur.rating && r.cur.rating < 3.8 ? BAD : INK } },
-            { text: r.cur.nps == null ? "–" : String(Math.round(r.cur.nps)) },
-          ];
-        }),
-      ],
-      { x: 8.2, y: 1.75, w: 4.6, colW: [1.9, 1.0, 0.85, 0.85], fontFace: BF, fontSize: 12, color: INK, border: { type: "solid", color: LINE, pt: 0.75 }, rowH: 0.36, margin: 0.05 },
-    );
+      .flatMap((st) => {
+        const c = curByStore.get(st.code);
+        return c?.bills ? [{ st, cur: c, prev: prevByStore.get(st.code), region: regionOfCode.get(st.code) ?? undefined }] : [];
+      })
+      .sort((a, b) => b.cur.revenue - a.cur.revenue || a.st.code.localeCompare(b.st.code));
+    const table = (list: typeof rows, x: number, y: number, w: number) =>
+      s.addTable(
+        [
+          ["Store", "Revenue", "MoM", "Rating"].map((h) => ({ text: h, options: { bold: true, color: MUTED } })),
+          ...list.map((r) => {
+            const mom = ch(r.cur.revenue, r.prev?.revenue ?? 0);
+            return [
+              { text: short(r.st.name) },
+              { text: money(r.cur.revenue) },
+              { text: pctTxt(mom), options: { color: pctColor(mom), bold: true } },
+              { text: r.cur.rating ? r.cur.rating.toFixed(1) : "–", options: { bold: true, color: r.cur.rating && r.cur.rating < 3.8 ? BAD : INK } },
+            ];
+          }),
+        ],
+        { x, y, w, colW: [w - 2.7, 1.0, 0.95, 0.75], fontFace: BF, fontSize: 11, color: INK, border: { type: "solid", color: LINE, pt: 0.75 }, rowH: 0.34, margin: 0.05 },
+      );
+    if (rows.length <= 12) {
+      title(s, rows[0] ? `${rows[0].st.name} leads with ${money(rows[0].cur.revenue)}` : "Stores", "Stores · last 30 days");
+      const labels = rows.map((r) => short(r.st.name));
+      const regs = [...new Set(rows.map((r) => r.region ?? "All India"))] as (Region | "All India")[];
+      s.addChart(
+        "bar",
+        regs.map((g) => ({ name: g, labels, values: rows.map((r) => ((r.region ?? "All India") === g ? L(r.cur.revenue) : 0)) })),
+        {
+          x: 0.5, y: 1.6, w: 7.0, h: 5.1, barDir: "bar", barGrouping: "stacked", barGapWidthPct: 50,
+          chartColors: regs.map((g) => REGION_COLOR[g]), showValue: true, dataLabelPosition: "inEnd", dataLabelColor: "FFFFFF", dataLabelFormatCode: '0.0" L";;;',
+          showLegend: true, legendPos: "b", valAxisLabelFormatCode: '0" L"', catAxisOrientation: "maxMin" as "minMax", ...axis,
+        },
+      );
+      table(rows, 7.8, 1.75, 5.0);
+    } else {
+      // Large networks: region × tier view plus the top and bottom stores.
+      const tiers = [1, 2].filter((t) => rows.some((r) => r.st.tier === t));
+      const regs = REGIONS.filter((g) => rows.some((r) => r.region === g));
+      const cell = (g: Region, t: number) => rows.filter((r) => r.region === g && r.st.tier === t).reduce((a, r) => a + r.cur.revenue, 0);
+      title(s, `${rows.length} stores · ${money(rows.reduce((a, r) => a + r.cur.revenue, 0))} in 30 days`, "Stores · last 30 days");
+      s.addChart(
+        "bar",
+        tiers.map((t) => ({ name: `Tier ${t}`, labels: regs, values: regs.map((g) => L(cell(g, t))) })),
+        {
+          x: 0.5, y: 1.6, w: 5.6, h: 5.1, barDir: "col", barGrouping: "stacked", barGapWidthPct: 60,
+          chartColors: [P, A].map((c) => (c === "FFFFFF" ? CAT[0]! : c)).slice(0, tiers.length), showValue: true, dataLabelPosition: "ctr", dataLabelColor: "FFFFFF", dataLabelFormatCode: '0" L";;;',
+          showLegend: true, legendPos: "b", valAxisLabelFormatCode: '0" L"', showTitle: true, title: "Revenue by region and city tier (₹ lakh)", titleFontFace: BF, titleFontSize: 13, titleColor: INK, ...axis,
+        },
+      );
+      s.addText("Top 6", { x: 6.4, y: 1.55, w: 3, h: 0.3, fontFace: BF, fontSize: 12, bold: true, color: GOOD, margin: 0, isTextBox: true });
+      table(rows.slice(0, 6), 6.4, 1.85, 6.4);
+      s.addText("Bottom 6", { x: 6.4, y: 4.35, w: 3, h: 0.3, fontFace: BF, fontSize: 12, bold: true, color: BAD, margin: 0, isTextBox: true });
+      table(rows.slice(-6), 6.4, 4.65, 6.4);
+    }
   }
 
   // ---- 8. Customer happiness ----
   {
     const s = pptx.addSlide({ masterName: "CONTENT" });
-    const top = ds.themes.slice(0, 6);
-    const totalMentions = top.reduce((a, x) => a + x.count, 0);
+    const top = themesFor(ds).slice(0, 6);
+    const totalMentions = themesFor(ds).reduce((a, x) => a + x.count, 0);
     title(s, top[0] ? `${top[0].option}: ${Math.round((100 * top[0].count) / Math.max(1, totalMentions))}% of complaints` : "Customer happiness", "Mission Happiness · last 30 days");
     if (top.length) {
       s.addChart("doughnut", [{ name: "Complaints", labels: top.map((x) => x.option), values: top.map((x) => x.count) }], {
@@ -365,22 +393,28 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
         dataLabelColor: "FFFFFF", showTitle: true, title: "What customers want fixed", titleFontFace: BF, titleFontSize: 13, titleColor: INK, ...axis,
       });
     }
+    const minR = ds.stores.length > 12 ? 10 : 1;
     const stores = ds.stores
-      .map((st) => ({ st, t: totals(inRange(ds, cur, [st.code])) }))
-      .filter((r) => r.t.responses)
-      .sort((a, b) => (a.t.rating ?? 0) - (b.t.rating ?? 0));
+      .flatMap((st) => {
+        const t = curByStore.get(st.code);
+        return t && t.responses >= minR ? [{ st, t }] : [];
+      })
+      .sort((a, b) => (a.t.rating ?? 0) - (b.t.rating ?? 0) || b.t.responses - a.t.responses)
+      .slice(0, 10);
     if (stores.length) {
-      s.addChart("bar", [{ name: "Rating", labels: stores.map((r) => r.st.name.replace(ds.brand, "").trim() || r.st.name), values: stores.map((r) => Math.round((r.t.rating ?? 0) * 100) / 100) }], {
+      s.addChart("bar", [{ name: "Rating", labels: stores.map((r) => short(r.st.name)), values: stores.map((r) => Math.round((r.t.rating ?? 0) * 100) / 100) }], {
         x: 6.8, y: 1.6, w: 6.0, h: 5.1, barDir: "bar", chartColors: [CAT[6]!], showValue: true, dataLabelPosition: "outEnd", dataLabelColor: INK, dataLabelFormatCode: "0.0",
-        valAxisMinVal: 0, valAxisMaxVal: 5, showLegend: false, showTitle: true, title: "Rating by store (out of 5)", titleFontFace: BF, titleFontSize: 13, titleColor: INK, ...axis,
+        valAxisMinVal: 0, valAxisMaxVal: 5, showLegend: false, showTitle: true, title: ds.stores.length > 12 ? `Lowest-rated 10 stores (min ${minR} ratings)` : "Rating by store (out of 5)", titleFontFace: BF, titleFontSize: 13, titleColor: INK,
+        catAxisOrientation: "maxMin" as "minMax", ...axis,
       });
     }
   }
 
   // ---- 9. Category mix ----
-  if (ds.categories.length) {
+  const allCats = categoriesFor(ds);
+  if (allCats.length) {
     const s = pptx.addSlide({ masterName: "CONTENT" });
-    const cats = [...ds.categories].sort((a, b) => b.revenue - a.revenue);
+    const cats = allCats;
     const shown = cats.slice(0, 6);
     const other = cats.slice(6).reduce((a, c) => a + c.revenue, 0);
     const total = cats.reduce((a, c) => a + c.revenue, 0) || 1;

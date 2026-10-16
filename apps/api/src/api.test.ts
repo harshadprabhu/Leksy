@@ -172,6 +172,17 @@ describe.skipIf(!DB_URL)("Leksy API", () => {
     expect(ds.days.length).toBeGreaterThan(0);
     expect(ds.days[0]).toHaveProperty("revenue");
     expect(JSON.stringify(ds)).not.toContain("+9198");
+    // Every breakdown reconciles with the daily rows and with the dashboard summary.
+    const from = ds.days.map((x: { date: string }) => x.date).sort()[0];
+    const sum = (xs: { revenue: number }[]) => xs.reduce((a, x) => a + x.revenue, 0);
+    const recent = ds.days.filter((x: { date: string }) => x.date >= new Date(Date.parse(`${ds.asOf}T00:00:00Z`) - 29 * 864e5).toISOString().slice(0, 10));
+    expect(sum(ds.categories)).toBeCloseTo(sum(recent), 2);
+    expect(ds.categories.every((c: { store?: string }) => c.store)).toBe(true);
+    const s = await app.inject({ method: "GET", url: `/v1/analytics/summary?from=${from}&to=${ds.asOf}`, headers: { authorization: `Bearer ${jwt}` } });
+    const summary = s.json();
+    expect(summary.bills).toBe(ds.days.reduce((a: number, x: { bills: number }) => a + x.bills, 0));
+    expect(Number(summary.revenue)).toBeCloseTo(sum(ds.days), 2);
+    expect(summary.opened).toBe(ds.days.reduce((a: number, x: { opened: number }) => a + x.opened, 0));
   });
 
   it("keeps tenants apart", async () => {

@@ -13,7 +13,9 @@ interface Summary {
   nps: number | null;
   openTickets: number;
   revenue: number;
-  byStore: { store: string; bills: number; opened: number; responses: number; avgRating: number | null; nps: number | null }[];
+  stores?: number;
+  themesWindow?: { from: string; to: string };
+  byStore: { store: string; name?: string; bills: number; opened: number; responses: number; avgRating: number | null; nps: number | null }[];
   byDay: { day: string; bills: number; opened: number; responses: number; avgRating: number | null }[];
   themes: { option: string; count: number }[];
 }
@@ -23,6 +25,7 @@ const pct = (a: number, b: number) => (b ? `${Math.round((100 * a) / b)}%` : "�
 
 export default function Dashboard() {
   const [days, setDays] = useState(30);
+  const [allStores, setAllStores] = useState(false);
   const range = useMemo(() => {
     const to = new Date();
     return { from: iso(new Date(to.getTime() - (days - 1) * 864e5)), to: iso(to) };
@@ -63,10 +66,10 @@ export default function Dashboard() {
       {s && (
         <div className="stack" style={{ gap: 14 }}>
           <div className="grid kpis">
-            <Kpi l="Bills" v={s.bills.toLocaleString("en-IN")} sub={inr(s.revenue)} />
-            <Kpi l="Delivered" v={pct(s.sent, s.bills)} sub={`${s.sent} sent`} />
-            <Kpi l="Opened" v={pct(s.opened, s.sent)} sub={`${s.opened} opens`} />
-            <Kpi l="Survey response" v={pct(s.responses, s.opened)} sub={`${s.responses} answers`} />
+            <Kpi l="Bills" v={s.bills.toLocaleString("en-IN")} sub={`${inr(s.revenue)}${s.stores ? ` · ${s.stores} stores` : ""}`} />
+            <Kpi l="Delivered" v={pct(s.sent, s.bills)} sub={`${s.sent.toLocaleString("en-IN")} sent`} />
+            <Kpi l="Opened" v={pct(s.opened, s.sent)} sub={`${s.opened.toLocaleString("en-IN")} opens`} />
+            <Kpi l="Survey response" v={pct(s.responses, s.opened)} sub={`${s.responses.toLocaleString("en-IN")} answers`} />
             <Kpi l="Happiness" v={s.avgRating != null ? `${s.avgRating.toFixed(1)} / 5` : "–"} sub="average rating" />
             <Kpi l="NPS" v={s.nps != null ? String(Math.round(s.nps)) : "–"} sub={`${s.openTickets} open tickets`} />
           </div>
@@ -84,7 +87,7 @@ export default function Dashboard() {
               )}
             </div>
             <div className="card">
-              <h2>What customers want fixed</h2>
+              <h2>What customers want fixed{s.themesWindow && <span className="small muted"> · {s.themesWindow.from} to {s.themesWindow.to}</span>}</h2>
               {s.themes.length ? (
                 <div className="stack">
                   {s.themes.map((t) => (
@@ -105,7 +108,15 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="card">
-            <h2>Stores, least happy first</h2>
+            <div className="spread">
+              <h2>Stores, least happy first</h2>
+              {s.byStore.length > 15 && (
+                <button className="btn sm" onClick={() => setAllStores(!allStores)}>
+                  {allStores ? "Show 15" : `Show all ${s.byStore.length}`}
+                </button>
+              )}
+            </div>
+            <div className="small muted">Ranked among stores with at least 10 ratings in this period; showing {allStores ? s.byStore.length : Math.min(15, s.byStore.length)} of {s.byStore.length} stores.</div>
             <table className="t">
               <thead>
                 <tr>
@@ -118,10 +129,12 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {s.byStore.map((r) => (
+                {(allStores ? s.byStore : s.byStore.slice(0, 15)).map((r) => (
                   <tr key={r.store}>
-                    <td>{r.store}</td>
-                    <td className="num">{r.bills}</td>
+                    <td>
+                      {r.name ?? r.store} <span className="muted small mono">{r.store}</span>
+                    </td>
+                    <td className="num">{r.bills.toLocaleString("en-IN")}</td>
                     <td className="num">{pct(r.opened, r.bills)}</td>
                     <td className="num">{r.responses}</td>
                     <td className="num">{r.avgRating != null ? <span className={`badge ${r.avgRating < 3 ? "bad" : r.avgRating < 4 ? "warn" : "good"}`}>{r.avgRating.toFixed(1)}</span> : "–"}</td>

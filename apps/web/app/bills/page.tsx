@@ -8,6 +8,7 @@ interface Row {
   id: string;
   invoiceNo: string;
   storeCode: string;
+  storeName?: string;
   total: string;
   issuedAt: string;
   status: string;
@@ -30,7 +31,7 @@ const STATUS: Record<string, string> = { sent: "good", delivered: "good", failed
 export default function Bills() {
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
-  const { data, error, reload } = useApi<{ bills: Row[] }>(`/v1/bills?limit=100${query ? `&q=${encodeURIComponent(query)}` : ""}`);
+  const { data, error, reload } = useApi<{ bills: Row[]; total?: number }>(`/v1/bills?limit=100${query ? `&q=${encodeURIComponent(query)}` : ""}`);
   const [open, setOpen] = useState<Detail | null>(null);
   return (
     <Shell>
@@ -73,7 +74,9 @@ export default function Bills() {
               {data?.bills.map((b) => (
                 <tr key={b.id} className="click" onClick={async () => setOpen(await api<Detail>(`/v1/bills/${b.id}`))}>
                   <td>{b.invoiceNo}</td>
-                  <td>{b.storeCode}</td>
+                  <td>
+                    {b.storeName ?? b.storeCode} <span className="muted small mono">{b.storeCode}</span>
+                  </td>
                   <td className="muted">{dt(b.issuedAt)}</td>
                   <td className="num">{inr(b.total)}</td>
                   <td>
@@ -89,6 +92,11 @@ export default function Bills() {
             </tbody>
           </table>
           {data && !data.bills.length && <div className="empty">No bills yet. Send one through the API or an integration.</div>}
+          {data?.total != null && data.total > data.bills.length && (
+            <div className="small muted" style={{ marginTop: 8 }}>
+              Showing the latest {data.bills.length} of {data.total.toLocaleString("en-IN")} itemised bills. Search by invoice, phone or store to find others.
+            </div>
+          )}
         </div>
         {open && (
           <div className="card stack">

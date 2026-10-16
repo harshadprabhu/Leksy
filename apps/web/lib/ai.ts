@@ -1,5 +1,5 @@
 "use client";
-import { DEFAULT_POLICY, type Answer, type Dataset, type SharePolicy } from "@leksy/insights";
+import { DEFAULT_POLICY, guardNumbers, type Answer, type Dataset, type SharePolicy } from "@leksy/insights";
 
 /** Brand-level AI settings, kept in brand.settings.ai (admins change them in Settings). */
 export interface AiSettings {
@@ -66,19 +66,30 @@ async function ollamaChat(ai: AiSettings, system: string, user: string): Promise
 const RULES =
   "You are a retail analyst inside the company's own Leksy dashboard. Use ONLY the figures provided; never invent or estimate numbers that are not there. If the data cannot answer, say what is missing. Answer in 3-6 short bullet points in plain English, most important first, then one recommended action.";
 
+/**
+ * Model wording is only shown when every figure in it is one the engine computed.
+ * Otherwise it throws, and the page keeps showing the exact computed answer.
+ */
+function guarded(text: string, source: string): string {
+  const g = guardNumbers(text, source);
+  if (!g.ok) throw new Error(`The local model's wording was hidden because it contained figures that are not in the computed data (${g.unknown.slice(0, 5).join(", ")}). The numbers shown above are exact.`);
+  return text;
+}
+
 /** Ask the local model to explain an answer the engine already computed. */
 export async function localNarrative(ai: AiSettings, a: Answer): Promise<string> {
   const table = a.table ? `\nTable (${a.table.columns.join(" | ")}):\n${a.table.rows.slice(0, 25).map((r) => r.join(" | ")).join("\n")}` : "";
-  return ollamaChat(ai, RULES, `Question: ${a.question}\nComputed results:\n${a.summary.map((s) => `- ${s}`).join("\n")}${table}`);
+  const source = `Computed results:\n${a.summary.map((s) => `- ${s}`).join("\n")}${table}`;
+  return guarded(await ollamaChat(ai, RULES, `Question: ${a.question}\n${source}`), `${a.question}\n${source}`);
 }
 
 /** Open question the built-in engine did not recognise: answer from a compact local summary. */
 export async function localFreeAnswer(ai: AiSettings, question: string, context: string): Promise<string> {
-  return ollamaChat(ai, RULES, `Company data summary:\n${context}\n\nQuestion: ${question}`);
+  return guarded(await ollamaChat(ai, RULES, `Company data summary:\n${context}\n\nQuestion: ${question}`), `${question}\n${context}`);
 }
 
 /** Compact, aggregate-only context for open questions to the local model. */
 export function contextSummary(ds: Dataset, answers: Answer[]): string {
   const lines = answers.slice(0, 6).flatMap((a) => [`## ${a.title}`, ...a.summary.map((s) => `- ${s}`)]);
-  return [`Brand ${ds.brand}, data as of ${ds.asOf}. Stores: ${ds.stores.map((s) => s.name).join(", ")}.`, ...lines].join("\n");
+  return [`Brand ${ds.brand}, data as of ${ds.asOf}. ${ds.stores.length} stores in ${new Set(ds.stores.map((s) => s.city)).size} cities.`, ...lines].join("\n");
 }

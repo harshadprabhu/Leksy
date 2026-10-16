@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { BrandKitCard } from "@/components/BrandKitCard";
 import { AiSettingsCard, DeckSettingsCard } from "@/components/insights/AiSettingsCards";
 import { Shell } from "@/components/Shell";
 import { api, dt } from "@/lib/api";
@@ -32,6 +33,8 @@ export default function Settings() {
   const [hookUrl, setHookUrl] = useState("");
   const [store, setStore] = useState({ code: "", name: "", city: "", managerPhone: "", managerEmail: "" });
   const [msg, setMsg] = useState<string | null>(null);
+  const [kitVersion, setKitVersion] = useState(0);
+  const [allStores, setAllStores] = useState(false);
   useEffect(() => {
     if (me.data) setBrand(me.data.brand);
   }, [me.data]);
@@ -64,7 +67,11 @@ export default function Settings() {
             ).map(([k, l]) => (
               <label key={k} className="f">
                 {l}
-                <input value={brand[k] ?? ""} onChange={(e) => setBrand({ ...brand, [k]: e.target.value })} />
+                {k === "logoUrl" && brand.logoUrl?.startsWith("data:") ? (
+                  <div className="small muted">Uploaded in the brand kit below.</div>
+                ) : (
+                  <input value={brand[k] ?? ""} onChange={(e) => setBrand({ ...brand, [k]: e.target.value })} />
+                )}
               </label>
             ))}
             <button className="btn primary">Save brand</button>
@@ -144,8 +151,13 @@ export default function Settings() {
       </div>
       {me.data && (
         <div className="grid two" style={{ marginTop: 14 }}>
+          <BrandKitCard
+            brand={me.data.brand}
+            settings={me.data.brand.settings ?? {}}
+            onSaved={() => void me.reload().then(() => setKitVersion((v) => v + 1))}
+          />
+          <DeckSettingsCard key={`deck-${kitVersion}`} settings={me.data.brand.settings ?? {}} company={me.data.brand.name} onSaved={() => void me.reload()} />
           <AiSettingsCard settings={me.data.brand.settings ?? {}} onSaved={() => void me.reload()} />
-          <DeckSettingsCard settings={me.data.brand.settings ?? {}} company={me.data.brand.name} onSaved={() => void me.reload()} />
         </div>
       )}
       <div className="card stack" style={{ marginTop: 14 }}>
@@ -161,7 +173,7 @@ export default function Settings() {
             </tr>
           </thead>
           <tbody>
-            {stores.data?.stores.map((s) => (
+            {(allStores ? stores.data?.stores : stores.data?.stores.slice(0, 20))?.map((s) => (
               <tr key={s.id}>
                 <td className="mono">{s.code}</td>
                 <td>{s.name}</td>
@@ -172,6 +184,11 @@ export default function Settings() {
             ))}
           </tbody>
         </table>
+        {(stores.data?.stores.length ?? 0) > 20 && (
+          <button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => setAllStores(!allStores)}>
+            {allStores ? "Show 20" : `Show all ${stores.data!.stores.length} stores`}
+          </button>
+        )}
         <form
           className="row"
           onSubmit={async (e) => {

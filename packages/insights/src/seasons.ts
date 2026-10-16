@@ -4,7 +4,7 @@
  * to pull. Everything is computed from the company's own history.
  */
 import { FESTIVALS, festivalsFor, PLAYBOOK, REGIONS, regionOf, type Festival, type Play, type Region } from "./calendar.js";
-import { addDays, daysBetween, inRange, totals, type Dataset } from "./dataset.js";
+import { addDays, categoriesFor, daysBetween, groupTotals, inRange, themesFor, totals, type Dataset } from "./dataset.js";
 import { forecast, mondayOf, toWeekly, type ForecastResult } from "./forecast.js";
 
 export interface RegionWeek {
@@ -15,6 +15,8 @@ export interface RegionWeek {
   low: number;
   high: number;
   lastWeek: number;
+  /** Monday of the last full week, which `lastWeek` and `wowPct` refer to. */
+  lastWeekOf: string;
   sameWeekLastYear: number | null;
   wowPct: number | null;
   yoyPct: number | null;
@@ -56,7 +58,8 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
 function fit(ds: Dataset, stores: string[] | null, regions: Region[] | undefined, horizon: number): ForecastResult | null {
   try {
-    const weeks = toWeekly(ds.days.filter((d) => !stores || stores.includes(d.store)), "revenue", ds.asOf);
+    const only = stores ? new Set(stores) : null;
+    const weeks = toWeekly(only ? ds.days.filter((d) => only.has(d.store)) : ds.days, "revenue", ds.asOf);
     return forecast(weeks, horizon, "revenue", 8, festivalsFor(regions));
   } catch {
     return null;
@@ -70,7 +73,8 @@ function fit(ds: Dataset, stores: string[] | null, regions: Region[] | undefined
 export function nextWeekByRegion(ds: Dataset): RegionWeek[] {
   const out: RegionWeek[] = [];
   const byRegion = storesByRegion(ds);
-  const unassigned = ds.stores.map((s) => s.code).filter((c) => ![...byRegion.values()].flat().includes(c));
+  const assigned = new Set([...byRegion.values()].flat());
+  const unassigned = ds.stores.map((s) => s.code).filter((c) => !assigned.has(c));
   const groups: [RegionWeek["region"], string[] | null, Region[] | undefined][] = [
     ...[...byRegion].map(([r, s]) => [r, s, [r]] as [Region, string[], Region[]]),
     ...(unassigned.length ? [["All India", unassigned, undefined] as [RegionWeek["region"], string[], undefined]] : []),
@@ -90,6 +94,7 @@ export function nextWeekByRegion(ds: Dataset): RegionWeek[] {
       low: next.low,
       high: next.high,
       lastWeek: last,
+      lastWeekOf: fc.history.at(-1)!.week,
       sameWeekLastYear: ly,
       wowPct: last ? (100 * (next.value - last)) / last : null,
       yoyPct: ly ? (100 * (next.value - ly)) / ly : null,
@@ -112,6 +117,7 @@ export function nextWeekByRegion(ds: Dataset): RegionWeek[] {
       low: tot("low"),
       high: tot("high"),
       lastWeek: last,
+      lastWeekOf: parts[0]!.lastWeekOf,
       sameWeekLastYear: ly,
       wowPct: last ? (100 * (v - last)) / last : null,
       yoyPct: ly ? (100 * (v - ly)) / ly : null,
@@ -126,7 +132,8 @@ export function nextWeekByRegion(ds: Dataset): RegionWeek[] {
 function lastLift(ds: Dataset, name: string, stores: string[]): { lift: number | null; date: string | null } {
   const prev = FESTIVALS.filter((f) => f.name === name && f.date < ds.asOf).sort((a, b) => b.date.localeCompare(a.date))[0];
   if (!prev) return { lift: null, date: null };
-  const weeks = toWeekly(ds.days.filter((d) => stores.includes(d.store)), "revenue", ds.asOf);
+  const only = new Set(stores);
+  const weeks = toWeekly(ds.days.filter((d) => only.has(d.store)), "revenue", ds.asOf);
   const w = mondayOf(prev.date);
   const at = weeks.find((p) => p.week === w);
   const around = weeks.filter((p) => Math.abs(daysBetween(w, p.week)) >= 21 && Math.abs(daysBetween(w, p.week)) <= 49).map((p) => p.value).sort((a, b) => a - b);
@@ -136,14 +143,14 @@ function lastLift(ds: Dataset, name: string, stores: string[]): { lift: number |
 }
 
 /** Festivals in the next `days`, for the regions this company trades in. */
-export function upcomingMoments(ds: Dataset, days = 60): SeasonMoment[] {
+export function upcomingMoments(ds: Dataset, days = 60, names?: string[]): SeasonMoment[] {
   const byRegion = storesByRegion(ds);
   const present = [...byRegion.keys()];
   const end = addDays(ds.asOf, days);
   const seen = new Set<string>();
   const out: SeasonMoment[] = [];
   for (const f of FESTIVALS) {
-    if (f.date < ds.asOf || f.date > end) continue;
+    if (f.date < ds.asOf || f.date > end || (names && !names.includes(f.name))) continue;
     const scope = f.regions;
     if (scope !== "National" && !scope.some((r) => present.includes(r))) continue;
     const key = `${f.name}|${f.date}`;
@@ -183,14 +190,17 @@ export function decisions(ds: Dataset, moments = upcomingMoments(ds), weeks = ne
       by: addDays(m.date, -10),
     });
   }
+  const byStore = groupTotals(ds, cur, (c) => c);
   const storeRows = ds.stores
-    .map((s) => ({ s, t: totals(inRange(ds, cur, [s.code])) }))
-    .filter((x) => x.t.responses >= 3)
-    .sort((a, b) => (a.t.rating ?? 9) - (b.t.rating ?? 9));
+    .flatMap((s) => {
+      const t = byStore.get(s.code);
+      return t && t.responses >= 10 ? [{ s, t }] : [];
+    })
+    .sort((a, b) => (a.t.rating ?? 9) - (b.t.rating ?? 9) || b.t.responses - a.t.responses);
   const worst = storeRows[0];
   if (worst && all.rating && (worst.t.rating ?? 5) < all.rating - 0.2) {
     out.push({
-      decision: `${worst.s.name}: fix ${(ds.themes[0]?.option ?? "service").toLowerCase()} before festive peak`,
+      decision: `${worst.s.name}: fix ${(themesFor(ds, [worst.s.code])[0]?.option ?? "service").toLowerCase()} before festive peak`,
       metric: `Rating ${worst.t.rating!.toFixed(1)} vs ${all.rating.toFixed(1)} brand avg · NPS ${worst.t.nps == null ? "–" : Math.round(worst.t.nps)}`,
       owner: "Store manager",
       by: addDays(ds.asOf, 7),
@@ -198,11 +208,12 @@ export function decisions(ds: Dataset, moments = upcomingMoments(ds), weeks = ne
   }
   const fastest = weeks.filter((w) => w.region !== "All India" && w.wowPct != null).sort((a, b) => b.wowPct! - a.wowPct!)[0];
   if (fastest && fastest.wowPct! > 5) {
-    out.push({ decision: `${fastest.region}: add floor staff next week`, metric: `${inrShort(fastest.value)} forecast · ${fastest.wowPct! >= 0 ? "+" : ""}${fastest.wowPct!.toFixed(0)}% WoW`, owner: `${fastest.region} regional head`, by: addDays(fastest.week, -2) });
+    out.push({ decision: `${fastest.region}: add floor staff next week`, metric: `${inrShort(fastest.value)} forecast · ${fastest.wowPct! >= 0 ? "+" : ""}${fastest.wowPct!.toFixed(0)}% vs w/c ${new Date(`${fastest.lastWeekOf}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" })}`, owner: `${fastest.region} regional head`, by: addDays(fastest.week, -2) });
   }
-  const topCat = [...ds.categories].sort((a, b) => b.revenue - a.revenue)[0];
+  const cats = categoriesFor(ds);
+  const topCat = cats[0];
   if (topCat) {
-    const share = (100 * topCat.revenue) / Math.max(1, sum(ds.categories.map((c) => c.revenue)));
+    const share = (100 * topCat.revenue) / Math.max(1, sum(cats.map((c) => c.revenue)));
     out.push({ decision: `Protect ${topCat.category.toLowerCase()} availability`, metric: `${share.toFixed(0)}% of revenue (30 days)`, owner: "Merchandising", by: addDays(ds.asOf, 7) });
   }
   // A deadline already passed means "now".

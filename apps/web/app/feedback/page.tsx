@@ -27,7 +27,7 @@ const FILTERS = [
 
 export default function Feedback() {
   const [ticket, setTicket] = useState("");
-  const { data, reload } = useApi<{ feedback: Row[] }>(`/v1/feedback?limit=100${ticket ? `&ticket=${ticket}` : ""}`);
+  const { data, reload } = useApi<{ feedback: Row[]; total?: number }>(`/v1/feedback?limit=100${ticket ? `&ticket=${ticket}` : ""}`);
   const update = async (id: string, ticketStatus: Row["ticketStatus"]) => {
     const note = ticketStatus === "resolved" ? (prompt("How was it resolved?") ?? undefined) : undefined;
     await api(`/v1/feedback/${id}`, { method: "PATCH", body: { ticketStatus, resolutionNote: note } });
@@ -112,6 +112,7 @@ export default function Feedback() {
           </tbody>
         </table>
         {data && !data.feedback.length && <div className="empty">No responses yet.</div>}
+        {data?.total != null && data.total > data.feedback.length && <div className="small muted">Showing the latest {data.feedback.length} of {data.total.toLocaleString("en-IN")} responses.</div>}
       </div>
     </Shell>
   );
