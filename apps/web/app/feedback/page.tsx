@@ -92,7 +92,7 @@ export default function Feedback() {
         </div>
       </div>
       <div className="card" style={{ overflowX: "auto" }}>
-        <table className="t branded">
+        <table className="t stack branded">
           <thead>
             <tr>
               <th>When</th>

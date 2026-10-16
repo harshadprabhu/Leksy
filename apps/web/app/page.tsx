@@ -438,7 +438,7 @@ export default function Dashboard() {
                 </Link>
               </span>
             </div>
-            <table className="t">
+            <table className="t stack">
               <thead>
                 <tr>
                   <th>Staff</th>

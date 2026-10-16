@@ -147,7 +147,7 @@ export default function Surveys() {
         </div>
       </div>
       {msg && <div className="card small" style={{ marginBottom: 12 }}>{msg}</div>}
-      <div className="grid" style={{ gridTemplateColumns: "minmax(0,1.5fr) minmax(320px,1fr)", alignItems: "start" }}>
+      <div className="grid sv-grid">
         <div className="stack">
           <div className="card stack">
             <div className="row">

@@ -74,9 +74,9 @@ export default function Bills() {
         </form>
       </PageHero>
       {error && <div className="err">{error}</div>}
-      <div className="grid two" style={{ gridTemplateColumns: open ? "1.3fr 1fr" : "1fr" }}>
+      <div className={`grid bills-grid ${open ? "open" : ""}`}>
         <div className="card" style={{ overflow: "auto" }}>
-          <table className="t branded">
+          <table className="t stack branded">
             <thead>
               <tr>
                 <th>Invoice</th>
@@ -91,7 +91,11 @@ export default function Bills() {
             </thead>
             <tbody>
               {data?.bills.map((b) => (
-                <tr key={b.id} className="click" onClick={async () => setOpen(await api<Detail>(`/v1/bills/${b.id}`))}>
+                <tr key={b.id} className="click" onClick={async () => {
+                    setOpen(await api<Detail>(`/v1/bills/${b.id}`));
+                    // On phones the detail opens above the list: bring it into view.
+                    if (window.innerWidth < 900) requestAnimationFrame(() => document.getElementById("bill-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                  }}>
                   <td className="nowrap mono">{b.invoiceNo}</td>
                   <td>
                     {b.storeName ?? b.storeCode} <span className="muted small mono">{b.storeCode}</span>
@@ -118,7 +122,7 @@ export default function Bills() {
           )}
         </div>
         {open && (
-          <div className="card stack">
+          <div className="card stack bill-detail" id="bill-detail">
             <div className="spread">
               <h2 style={{ margin: 0 }}>{open.bill.invoiceNo}</h2>
               <div className="row">

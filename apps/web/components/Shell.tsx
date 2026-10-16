@@ -58,6 +58,31 @@ function useBrandKit(ready: boolean) {
   return { kit, known };
 }
 
+/**
+ * Tables marked "stack" become cards on phones; each cell shows its column's
+ * heading as a label, taken from the table header so pages need no extra markup.
+ */
+function useStackLabels(on: boolean) {
+  useEffect(() => {
+    if (!on) return;
+    const label = () => {
+      document.querySelectorAll<HTMLTableElement>("table.stack").forEach((t) => {
+        const heads = [...t.querySelectorAll("thead th")].map((th) => (th.textContent ?? "").replace(/[▲▼]/g, "").trim());
+        t.querySelectorAll("tbody tr").forEach((tr) =>
+          [...tr.children].forEach((td, i) => {
+            const l = heads[i] ?? "";
+            if (td.getAttribute("data-label") !== l) td.setAttribute("data-label", l);
+          }),
+        );
+      });
+    };
+    label();
+    const mo = new MutationObserver(label);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [on]);
+}
+
 const NAV = [
   ["/", "Dashboard"],
   ["/insights", "Insights"],
@@ -97,6 +122,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     else setReady(true);
   }, [router]);
   const { kit, known } = useBrandKit(ready);
+  useStackLabels(ready && known);
   if (opening) return <div className="empty">Opening the brand demo…</div>;
   // Draw nothing until the brand is known, so no other logo or colour flashes first.
   if (!ready || !known) return null;

@@ -65,7 +65,7 @@ export default function Triggers() {
       </div>
       <div className="grid two">
         <div className="card">
-          <table className="t">
+          <table className="t stack">
             <thead>
               <tr>
                 <th>#</th>

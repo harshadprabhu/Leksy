@@ -333,3 +333,53 @@ table.t.branded thead th:last-child { border-top-right-radius: 8px; }
   .dash-grid .spread > .small, .card > .spread > .small { font-size: 11px; }
 }
 .league td.num { white-space: nowrap; }
+
+/* ---------- Page layouts that stack on phones ---------- */
+.ins-grid { grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); align-items: start; }
+.ins-side { position: sticky; top: 16px; }
+.sv-grid { grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr); align-items: start; }
+.map-grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+.map-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 130px; gap: 8px; }
+.bills-grid { grid-template-columns: minmax(0, 1fr); }
+.bills-grid.open { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+.canvas iframe { max-width: 100%; }
+@media (max-width: 900px) {
+  .ins-grid, .sv-grid, .map-grid, .bills-grid.open { grid-template-columns: minmax(0, 1fr); }
+  .ins-side { position: static; }
+  .bills-grid .bill-detail { order: -1; scroll-margin-top: 64px; }
+  /* Template Studio: preview first, then blocks and layers, then properties. */
+  .studio-wrap { height: auto; display: block; }
+  .studio-top { flex-wrap: wrap; position: sticky; top: 0; z-index: 10; }
+  .studio-body { display: flex; flex-direction: column; }
+  .studio-body .canvas { order: -1; padding: 14px 8px; min-height: 60vh; }
+  .studio-body .pane { overflow: visible; border: 0; border-top: 1px solid var(--line); }
+}
+@media (max-width: 600px) {
+  .map-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .map-row > :first-child { grid-column: 1 / -1; font-weight: 600; }
+  .hero-search { width: 100%; }
+  .hero-search input { min-width: 0; flex: 1; }
+  .faces-row { gap: 2px; }
+  .ins-stats { gap: 16px; }
+  .ins-stats b { font-size: 21px; }
+  /* Tables marked "stack" become one card per row, each cell labelled. */
+  table.t.stack, table.t.stack tbody, table.t.stack tr, table.t.stack td { display: block; width: 100%; }
+  table.t.stack thead { display: none; }
+  table.t.stack tr { border: 1px solid var(--line); border-radius: 12px; padding: 6px 12px; margin: 0 0 10px; background: var(--panel); }
+  table.t.stack tr.click:active { background: var(--accent-soft); }
+  table.t.stack td { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; border: 0; border-bottom: 1px dashed var(--line); text-align: right; white-space: normal; }
+  table.t.stack tr td:last-child { border-bottom: 0; }
+  table.t.stack td::before { content: attr(data-label); color: var(--muted); font-size: 12px; text-align: left; flex: none; max-width: 42%; }
+  table.t.stack td[data-label=""]::before { display: none; }
+  table.t.stack td[data-label=""] { justify-content: flex-start; }
+  table.t.stack td > .stack, table.t.stack td > .tags, table.t.stack td > .row { justify-content: flex-end; align-items: flex-end; }
+  .card:has(> table.t.stack) { padding: 8px; background: transparent; border: 0; }
+}
+.two { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+pre.code { max-width: 100%; overflow: auto; }
+@media (max-width: 900px) { .two { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .card .mono { overflow-wrap: anywhere; } }
+@media (max-width: 600px) {
+  table.t.stack td { justify-content: flex-end; }
+  table.t.stack td::before { margin-right: auto; }
+}

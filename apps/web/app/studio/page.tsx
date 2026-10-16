@@ -33,7 +33,7 @@ export default function Templates() {
         <div className="card">
           <h2>Your templates</h2>
           {error && <div className="err">{error}</div>}
-          <table className="t">
+          <table className="t stack">
             <thead>
               <tr>
                 <th>Name</th>

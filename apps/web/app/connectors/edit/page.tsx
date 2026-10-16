@@ -213,7 +213,7 @@ function Mapper() {
       {!sample?.sample ? (
         <div className="card empty">No sample yet. {c.kind === "push" ? "Send one bill from your system to the URL above, then reload." : "Check the API URL and auth."}</div>
       ) : (
-        <div className="grid" style={{ gridTemplateColumns: "1.3fr 1fr" }}>
+        <div className="grid map-grid">
           <div className="card stack">
             <div className="spread">
               <h2 style={{ margin: 0 }}>Bill fields</h2>
@@ -306,7 +306,7 @@ function Mapper() {
 function MapRow({ label, required, paths, value, onChange }: { label: string; required: boolean; paths: string[]; value: Simple; onChange: (s: Simple) => void }) {
   const isConst = value.constant !== undefined;
   return (
-    <div className="row" style={{ display: "grid", gridTemplateColumns: "150px 1fr 130px", gap: 8 }}>
+    <div className="row map-row">
       <span className="small">
         {label}
         {required && <span style={{ color: "var(--bad)" }}> *</span>}

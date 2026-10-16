@@ -142,7 +142,7 @@ export default function Insights() {
         </div>
       </section>
 
-      <div className="grid" style={{ gridTemplateColumns: "minmax(0,1.6fr) minmax(320px,1fr)", alignItems: "start" }}>
+      <div className="grid ins-grid">
         <div className="stack">
           <form
             className="card stack ask-card"
@@ -239,7 +239,7 @@ export default function Insights() {
           })}
         </div>
 
-        <div className="stack" style={{ position: "sticky", top: 16 }}>
+        <div className="stack ins-side">
           {nextWeek.length > 0 && (
             <div className="card stack nw-card">
               {(() => {

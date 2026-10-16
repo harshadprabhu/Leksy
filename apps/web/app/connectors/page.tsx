@@ -39,7 +39,7 @@ export default function Connectors() {
         <div className="stack">
           <div className="card">
             <h2>Connected sources</h2>
-            <table className="t">
+            <table className="t stack">
               <thead>
                 <tr>
                   <th>Name</th>

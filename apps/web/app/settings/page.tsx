@@ -162,7 +162,7 @@ export default function Settings() {
       )}
       <div className="card stack" style={{ marginTop: 14 }}>
         <h2>Stores</h2>
-        <table className="t">
+        <table className="t stack">
           <thead>
             <tr>
               <th>Code</th>
