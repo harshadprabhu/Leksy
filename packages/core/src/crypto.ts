@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 const B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
@@ -72,4 +72,41 @@ export function canonicalJson(v: unknown): string {
       .join(",")}}`;
   }
   return JSON.stringify(v);
+}
+
+/**
+ * Secrets the app must read back (a brand API's token or password) are sealed with
+ * AES-256-GCM under LEKSY_SECRETS_KEY (32 bytes, base64 or hex) before they reach
+ * the database. Values stored before encryption existed are read as they are.
+ */
+const SEALED = "enc:v1:";
+
+function secretsKey(): Buffer | null {
+  const raw = process.env.LEKSY_SECRETS_KEY;
+  if (!raw) {
+    if (process.env.NODE_ENV === "production") throw new Error("Set LEKSY_SECRETS_KEY in production");
+    return null;
+  }
+  const key = /^[0-9a-f]{64}$/i.test(raw) ? Buffer.from(raw, "hex") : Buffer.from(raw, "base64");
+  if (key.length !== 32) throw new Error("LEKSY_SECRETS_KEY must be 32 bytes (64 hex or 44 base64 characters)");
+  return key;
+}
+
+export function sealSecret(plain: string): string {
+  const key = secretsKey();
+  if (!key || plain.startsWith(SEALED)) return plain;
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", key, iv);
+  const ct = Buffer.concat([c.update(plain, "utf8"), c.final()]);
+  return `${SEALED}${iv.toString("base64")}:${c.getAuthTag().toString("base64")}:${ct.toString("base64")}`;
+}
+
+export function openSecret(stored: string): string {
+  if (!stored.startsWith(SEALED)) return stored;
+  const key = secretsKey();
+  if (!key) throw new Error("LEKSY_SECRETS_KEY is needed to read stored credentials");
+  const [iv, tag, ct] = stored.slice(SEALED.length).split(":");
+  const d = createDecipheriv("aes-256-gcm", key, Buffer.from(iv!, "base64"));
+  d.setAuthTag(Buffer.from(tag!, "base64"));
+  return Buffer.concat([d.update(Buffer.from(ct!, "base64")), d.final()]).toString("utf8");
 }

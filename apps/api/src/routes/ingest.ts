@@ -3,7 +3,7 @@ import { connectors } from "@leksy/core/db";
 import { eq } from "drizzle-orm";
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import type { Deps } from "../app.js";
-import { anyAuth, apiKeyAuth, brandOf } from "../auth.js";
+import { anyAuth, apiKeyAuth, brandOf, inScope } from "../auth.js";
 
 export const ingestRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   const enqueue = async (r: IngestResult) => {
@@ -29,7 +29,9 @@ export const ingestRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
    * Our API, consumed by the brand: send one canonical bill.
    * Idempotent on (store_code, invoice_no); safe to retry.
    */
-  app.post("/v1/bills", { preHandler: anyAuth(d.db), config: { rateLimit: { max: 600, timeWindow: "1 minute" } } }, async (req, reply) => {
+  app.post("/v1/bills", { preHandler: anyAuth(d.db, ["owner", "admin", "manager"]), config: { rateLimit: { max: 600, timeWindow: "1 minute" } } }, async (req, reply) => {
+    const store = (req.body as { store_code?: unknown } | null)?.store_code;
+    if (typeof store === "string" && !inScope(req, store)) return reply.code(403).send({ error: "store_not_allowed" });
     try {
       const r = await ingestBill(d.db, brandOf(req), req.body, { source: "api", raw: req.body });
       await enqueue(r);

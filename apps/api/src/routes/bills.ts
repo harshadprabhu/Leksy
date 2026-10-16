@@ -1,10 +1,10 @@
 import { billLinks } from "@leksy/core";
-import { bills, deliveries, events, feedback } from "@leksy/core/db";
+import { bills, deliveries, events, feedback, stores } from "@leksy/core/db";
 import { and, desc, eq, ilike, inArray, lt, or, type SQL } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import type { Deps } from "../app.js";
-import { brandOf, userAuth } from "../auth.js";
+import { brandOf, inScope, userAuth } from "../auth.js";
 
 const ListQuery = z.object({
   limit: z.coerce.number().min(1).max(200).default(50),
@@ -34,6 +34,7 @@ export const billRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
         id: bills.id,
         invoiceNo: bills.invoiceNo,
         storeCode: bills.storeCode,
+        storeName: stores.name,
         total: bills.total,
         issuedAt: bills.issuedAt,
         status: bills.status,
@@ -45,6 +46,7 @@ export const billRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
       })
       .from(bills)
       .leftJoin(feedback, eq(feedback.billId, bills.id))
+      .leftJoin(stores, and(eq(stores.brandId, bills.brandId), eq(stores.code, bills.storeCode)))
       .where(and(...where))
       .orderBy(desc(bills.issuedAt))
       .limit(q.limit);
@@ -53,7 +55,7 @@ export const billRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
 
   app.get<{ Params: { id: string } }>("/v1/bills/:id", async (req, reply) => {
     const bill = await d.db.query.bills.findFirst({ where: and(eq(bills.id, req.params.id), eq(bills.brandId, brandOf(req))) });
-    if (!bill) return reply.code(404).send({ error: "not_found" });
+    if (!bill || !inScope(req, bill.storeCode)) return reply.code(404).send({ error: "not_found" });
     const [del, fb, ev] = await Promise.all([
       d.db.query.deliveries.findMany({ where: eq(deliveries.billId, bill.id), orderBy: desc(deliveries.createdAt) }),
       d.db.query.feedback.findFirst({ where: eq(feedback.billId, bill.id) }),
@@ -65,7 +67,7 @@ export const billRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
 
   app.post<{ Params: { id: string } }>("/v1/bills/:id/resend", { preHandler: userAuth(["owner", "admin", "manager"]) }, async (req, reply) => {
     const bill = await d.db.query.bills.findFirst({ where: and(eq(bills.id, req.params.id), eq(bills.brandId, brandOf(req))) });
-    if (!bill) return reply.code(404).send({ error: "not_found" });
+    if (!bill || !inScope(req, bill.storeCode)) return reply.code(404).send({ error: "not_found" });
     const body = z.object({ channels: z.array(z.enum(["whatsapp", "sms", "email"])).min(1).default(["whatsapp", "sms", "email"]) }).parse(req.body ?? {});
     await d.queues.deliver.add("resend", { billId: bill.id, channels: body.channels });
     return reply.code(202).send({ status: "queued" });

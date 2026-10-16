@@ -5,6 +5,7 @@ import rateLimit from "@fastify/rate-limit";
 import type { ChannelEnv, Queues } from "@leksy/core";
 import type { Db } from "@leksy/core/db";
 import Fastify, { type FastifyInstance } from "fastify";
+import { ZodError } from "zod";
 import type { Redis } from "ioredis";
 import type { Config } from "./config.js";
 import type { PdfRenderer } from "./pdf.js";
@@ -31,7 +32,7 @@ export async function buildApp(deps: Deps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: deps.cfg.NODE_ENV === "test" ? false : { level: "info", redact: ["req.headers.authorization", "req.headers.cookie"] },
     bodyLimit: 5 * 1024 * 1024,
-    trustProxy: true,
+    trustProxy: deps.cfg.TRUST_PROXY,
   });
 
   // Keep the raw body for HMAC signature checks.
@@ -53,9 +54,21 @@ export async function buildApp(deps: Deps): Promise<FastifyInstance> {
   await app.register(rateLimit, { global: false, redis: deps.cfg.NODE_ENV === "test" ? undefined : deps.redis });
 
   app.setErrorHandler((err, req, reply) => {
+    // Invalid input is the caller's mistake: 400 with the problems, not a server error.
+    if (err instanceof ZodError) return reply.code(400).send({ error: "invalid_request", details: err.issues.slice(0, 20).map((i) => ({ path: i.path.join("."), message: i.message })) });
     const status = (err as { statusCode?: number }).statusCode ?? 500;
-    if (status >= 500) req.log.error(err);
+    if (status >= 500) {
+      req.log.error(err);
+      if (process.env.LEKSY_DEBUG_ERRORS) console.error(err);
+    }
     reply.code(status).send({ error: status >= 500 ? "internal_error" : (err as Error).message });
+  });
+
+  // Record ids are UUIDs: anything else cannot exist, so answer 404 before touching the database.
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  app.addHook("preValidation", async (req, reply) => {
+    const id = (req.params as { id?: string } | undefined)?.id;
+    if (id !== undefined && !UUID.test(id)) return reply.code(404).send({ error: "not_found" });
   });
 
   app.get("/health", async () => ({ ok: true }));

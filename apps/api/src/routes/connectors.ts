@@ -1,5 +1,5 @@
 import { BillSchema, validateBill } from "@leksy/bill-schema";
-import { fetchFromBrand, randomToken } from "@leksy/core";
+import { assertPublicUrl, fetchFromBrand, randomToken, sealPullAuth } from "@leksy/core";
 import { connectors, type PullConfig } from "@leksy/core/db";
 import { applyMapping, MappingSchema, samplePaths, suggestMapping, type Mapping } from "@leksy/mapper";
 import { and, asc, eq } from "drizzle-orm";
@@ -56,7 +56,18 @@ export const connectorRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   const admin = userAuth(["owner", "admin"]);
   const ingestUrl = (key: string) => `${d.cfg.PUBLIC_BASE_URL.replace(/\/$/, "")}/v1/ingest/${key}`;
 
-  app.get("/v1/connectors", { preHandler: userAuth() }, async (req) => {
+  const checkUrl = async (url: string | undefined) => {
+    if (!url) return null;
+    try {
+      await assertPublicUrl(url, d.cfg.ALLOW_PRIVATE_URLS);
+      return null;
+    } catch (e) {
+      return (e as Error).message;
+    }
+  };
+
+  // Ingest URLs carry the connector's secret key, so only admins list them.
+  app.get("/v1/connectors", { preHandler: admin }, async (req) => {
     const rows = await d.db.query.connectors.findMany({ where: eq(connectors.brandId, brandOf(req)), orderBy: asc(connectors.createdAt) });
     return { connectors: rows.map((c) => ({ ...redact(c), ingestUrl: ingestUrl(c.ingestKey) })) };
   });
@@ -64,20 +75,25 @@ export const connectorRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   app.post("/v1/connectors", { preHandler: admin }, async (req, reply) => {
     const body = Upsert.parse(req.body);
     if (body.kind === "pull" && !body.pull) return reply.code(400).send({ error: "pull config required" });
+    const bad = await checkUrl(body.pull?.url);
+    if (bad) return reply.code(400).send({ error: "invalid_url", message: bad });
     const [row] = await d.db
       .insert(connectors)
-      .values({ brandId: brandOf(req), name: body.name, kind: body.kind, pull: (body.pull as PullConfig) ?? null, intervalSeconds: body.intervalSeconds ?? null, mapping: body.mapping ?? null, ingestKey: randomToken(24) })
+      .values({ brandId: brandOf(req), name: body.name, kind: body.kind, pull: body.pull ? sealPullAuth(body.pull as PullConfig) : null, intervalSeconds: body.intervalSeconds ?? null, mapping: body.mapping ?? null, ingestKey: randomToken(24) })
       .returning();
     return reply.code(201).send({ ...redact(row!), ingestUrl: ingestUrl(row!.ingestKey) });
   });
 
   app.put<{ Params: { id: string } }>("/v1/connectors/:id", { preHandler: admin }, async (req, reply) => {
     const body = Upsert.partial().parse(req.body);
+    const bad = await checkUrl(body.pull?.url);
+    if (bad) return reply.code(400).send({ error: "invalid_url", message: bad });
     const existing = await d.db.query.connectors.findFirst({ where: and(eq(connectors.id, req.params.id), eq(connectors.brandId, brandOf(req))) });
     if (!existing) return reply.code(404).send({ error: "not_found" });
     // Keep stored credentials when the UI sends back a redacted auth block.
     let pull = body.pull as PullConfig | undefined;
     if (pull && (pull.auth as { redacted?: boolean } | undefined)?.redacted) pull = { ...pull, auth: existing.pull?.auth };
+    else if (pull) pull = sealPullAuth(pull);
     const [row] = await d.db
       .update(connectors)
       .set({

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LeksyLogo, PoweredByLeksy } from "./LeksyLogo";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
-import { api, auth, DEMO } from "@/lib/api";
+import { api, auth, isAdmin, DEMO } from "@/lib/api";
 import { applyAppTheme, packFromHash, savePack, type BrandKit } from "@/lib/brandpack";
 import { load, resetDemo } from "@/lib/demo";
 
@@ -84,16 +84,17 @@ function useStackLabels(on: boolean) {
   }, [on]);
 }
 
+// The last flag marks set-up pages that only owners and admins can use.
 const NAV = [
-  ["/", "Dashboard"],
-  ["/insights", "Insights"],
-  ["/bills", "Bills"],
-  ["/feedback", "Project WOW"],
-  ["/surveys", "Survey editor"],
-  ["/studio", "Template Studio"],
-  ["/connectors", "Integrations"],
-  ["/triggers", "Triggers"],
-  ["/settings", "Settings"],
+  ["/", "Dashboard", false],
+  ["/insights", "Insights", false],
+  ["/bills", "Bills", false],
+  ["/feedback", "Project WOW", false],
+  ["/surveys", "Survey editor", true],
+  ["/studio", "Template Studio", true],
+  ["/connectors", "Integrations", true],
+  ["/triggers", "Triggers", true],
+  ["/settings", "Settings", true],
 ] as const;
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -127,6 +128,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   if (opening) return <div className="empty">Opening the brand demo…</div>;
   // Draw nothing until the brand is known, so no other logo or colour flashes first.
   if (!ready || !known) return null;
+  const admin = isAdmin();
+  const adminPage = NAV.some(([href, , adminOnly]) => adminOnly && path.startsWith(href));
   const sideLogo = kit?.ui ? (kit.logoLight ?? kit.logo) : kit?.logo;
   return (
     <div className="shell">
@@ -145,7 +148,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <small>e-bills · happiness</small>
           </div>
         )}
-        {NAV.map(([href, label]) => (
+        {NAV.filter(([, , adminOnly]) => !adminOnly || admin).map(([href, label]) => (
           <Link key={href} href={href} className={`nav ${href === "/" ? (path === "/" ? "on" : "") : path.startsWith(href) ? "on" : ""}`}>
             {label}
           </Link>
@@ -165,7 +168,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
       {kit?.watermark && (kit.mark ?? kit.logo) && <div className="app-wm" aria-hidden="true" style={{ backgroundImage: `url(${kit.mark ?? kit.logo})` }} />}
       <main className="main">
         {DEMO && <DemoBar />}
-        <BrandContext.Provider value={kit}>{children}</BrandContext.Provider>
+        <BrandContext.Provider value={kit}>
+          {adminPage && !admin ? (
+            <div className="card empty" role="alert">
+              Only owners and admins can open this page. Ask your account owner if you need it.
+            </div>
+          ) : (
+            children
+          )}
+        </BrandContext.Provider>
       </main>
     </div>
   );

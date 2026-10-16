@@ -2,7 +2,19 @@ import { applyMapping, getPath, type Mapping } from "@leksy/mapper";
 import { eq, sql } from "drizzle-orm";
 import { connectors, type Db, type PullConfig } from "../db/index.js";
 import { ingestBill, IngestError, type IngestResult } from "./ingest.js";
-import { assertPublicUrl } from "./net.js";
+import { openSecret, sealSecret } from "../crypto.js";
+import { assertPublicUrl, fetchBrandUrl } from "./net.js";
+
+type Auth = NonNullable<PullConfig["auth"]>;
+const mapAuth = (a: Auth | undefined, f: (s: string) => string): Auth | undefined => {
+  if (!a) return a;
+  if (a.type === "bearer") return { ...a, token: f(a.token) };
+  if (a.type === "basic") return { ...a, password: f(a.password) };
+  if (a.type === "header") return { ...a, value: f(a.value) };
+  return a;
+};
+/** Encrypt a pull connector's credentials before saving them. */
+export const sealPullAuth = (cfg: PullConfig): PullConfig => ({ ...cfg, auth: mapAuth(cfg.auth, sealSecret) });
 
 export interface PullOutcome {
   fetched: number;
@@ -16,18 +28,21 @@ export async function fetchFromBrand(cfg: PullConfig, cursor: string | null, all
   const url = await assertPublicUrl(cfg.url, allowPrivate);
   if (cursor && cfg.cursorParam) url.searchParams.set(cfg.cursorParam, cursor);
   const headers: Record<string, string> = { accept: "application/json", ...(cfg.headers ?? {}) };
-  const auth = cfg.auth ?? { type: "none" };
+  const auth = mapAuth(cfg.auth, openSecret) ?? { type: "none" };
   if (auth.type === "bearer") headers.authorization = `Bearer ${auth.token}`;
   if (auth.type === "basic") headers.authorization = `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString("base64")}`;
   if (auth.type === "header") headers[auth.name.toLowerCase()] = auth.value;
   const method = cfg.method ?? "GET";
-  const res = await fetch(url, {
-    method,
-    headers: method === "POST" ? { ...headers, "content-type": "application/json" } : headers,
-    body: method === "POST" ? JSON.stringify(cfg.body ?? {}) : undefined,
-    redirect: "error",
-    signal: AbortSignal.timeout(30_000),
-  });
+  const res = await fetchBrandUrl(
+    url,
+    {
+      method,
+      headers: method === "POST" ? { ...headers, "content-type": "application/json" } : headers,
+      body: method === "POST" ? JSON.stringify(cfg.body ?? {}) : undefined,
+      signal: AbortSignal.timeout(30_000),
+    },
+    allowPrivate,
+  );
   if (!res.ok) throw new Error(`Brand API returned ${res.status}`);
   const json = (await res.json()) as unknown;
   const list = cfg.billsPath ? getPath(json, cfg.billsPath) : json;

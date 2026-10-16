@@ -98,7 +98,13 @@ export default function Bills() {
                   }}>
                   <td className="nowrap mono">{b.invoiceNo}</td>
                   <td>
-                    {b.storeName ?? b.storeCode} <span className="muted small mono">{b.storeCode}</span>
+                    {b.storeName && b.storeName !== b.storeCode ? (
+                      <>
+                        {b.storeName} <span className="muted small mono nowrap">{b.storeCode}</span>
+                      </>
+                    ) : (
+                      <span className="mono nowrap">{b.storeCode}</span>
+                    )}
                   </td>
                   <td className="muted nowrap">{dt(b.issuedAt)}</td>
                   <td className="num nowrap">{inr(b.total)}</td>

@@ -14,7 +14,7 @@ export const insightsRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   app.get("/v1/insights/dataset", { preHandler: userAuth() }, async (req): Promise<Dataset> => {
     const brandId = brandOf(req);
     const codes = req.principal?.storeCodes?.length ? req.principal.storeCodes : null;
-    const scope = codes ? sql`and b.store_code = any(${codes})` : sql``;
+    const scope = codes ? sql`and b.store_code in ${codes}` : sql``;
     // Breakdowns cover the last 30 calendar days in India, the same window as the daily rows.
     const detail = sql`(b.issued_at at time zone 'Asia/Kolkata')::date >= (now() at time zone 'Asia/Kolkata')::date - 29`;
     const [brand, storeRows, days, staff, categories, themes, asOf] = await Promise.all([

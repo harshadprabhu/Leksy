@@ -22,7 +22,8 @@ const num = (v: unknown) => (v == null ? null : Number(v));
  * ClickHouse fed from the events table; the response shape stays the same.
  */
 export async function summary(db: Db, brandId: string, from: Date, to: Date, storeCodes?: string[]): Promise<Summary> {
-  const storeFilter = storeCodes?.length ? sql`and b.store_code = any(${storeCodes})` : sql``;
+  // drizzle expands an array into a parenthesised parameter list: "in ($1, $2)".
+  const storeFilter = storeCodes?.length ? sql`and b.store_code in ${storeCodes}` : sql``;
   const totals = await db.execute(sql`
     select count(*)::int as bills,
            count(*) filter (where b.status in ('sent','delivered'))::int as sent,
@@ -49,8 +50,8 @@ export async function summary(db: Db, brandId: string, from: Date, to: Date, sto
     group by 1 order by 1`);
   const themes = await db.execute(sql`
     select opt as option, count(*)::int as count
-    from feedback f, jsonb_array_elements_text(coalesce(f.answers->'improve', '[]'::jsonb)) opt
-    where f.brand_id = ${brandId} and f.created_at >= ${from} and f.created_at < ${to}
+    from feedback f join bills b on b.id = f.bill_id, jsonb_array_elements_text(coalesce(f.answers->'improve', '[]'::jsonb)) opt
+    where f.brand_id = ${brandId} and f.created_at >= ${from} and f.created_at < ${to} ${storeFilter}
     group by opt order by count(*) desc limit 10`);
   const t = totals.rows[0] as Record<string, unknown>;
   return {

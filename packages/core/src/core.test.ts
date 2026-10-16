@@ -47,3 +47,20 @@ describe("survey", () => {
     expect(cleanAnswers(PROJECT_WOW, { overall: 9 }).errors[0]).toMatch(/1–5/);
   });
 });
+
+describe("sealed secrets", () => {
+  it("encrypts with AES-GCM, opens again, and refuses tampering", async () => {
+    const { sealSecret, openSecret } = await import("./crypto.js");
+    process.env.LEKSY_SECRETS_KEY = "a".repeat(64);
+    const sealed = sealSecret("pos-api-token-123");
+    expect(sealed).toMatch(/^enc:v1:/);
+    expect(sealed).not.toContain("pos-api-token-123");
+    expect(sealSecret("pos-api-token-123")).not.toBe(sealed);
+    expect(openSecret(sealed)).toBe("pos-api-token-123");
+    expect(openSecret("plain-old-value")).toBe("plain-old-value");
+    const parts = sealed.split(":");
+    parts[4] = Buffer.from("tampered").toString("base64");
+    expect(() => openSecret(parts.join(":"))).toThrow();
+    delete process.env.LEKSY_SECRETS_KEY;
+  });
+});

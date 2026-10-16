@@ -59,14 +59,20 @@ export function userAuth(roles?: Principal["role"][]) {
 }
 
 /** Accept either a dashboard JWT or an API key (for endpoints both can use). */
-export function anyAuth(db: Db) {
+export function anyAuth(db: Db, roles?: Principal["role"][]) {
   const key = apiKeyAuth(db);
-  const user = userAuth();
+  const user = userAuth(roles);
   return async (req: FastifyRequest, reply: FastifyReply) => {
     const h = req.headers.authorization ?? "";
     return /^Bearer\s+lk_/i.test(h) ? key(req, reply) : user(req, reply);
   };
 }
+
+/** A user limited to some stores may only touch those stores; API keys and unscoped users see all. */
+export const inScope = (req: FastifyRequest, storeCode: string) => {
+  const scope = req.principal?.storeCodes;
+  return !scope?.length || scope.includes(storeCode);
+};
 
 export const brandOf = (req: FastifyRequest) => {
   if (!req.principal) throw new Error("no principal");

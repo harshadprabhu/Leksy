@@ -20,6 +20,8 @@ export const providerRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   });
 
   app.post("/hooks/whatsapp", async (req, reply) => {
+    // Receipts change delivery status, so in production they must be signed by Meta.
+    if (!d.cfg.WHATSAPP_APP_SECRET && d.cfg.NODE_ENV === "production") return reply.code(401).send();
     if (d.cfg.WHATSAPP_APP_SECRET) {
       const sig = String(req.headers["x-hub-signature-256"] ?? "");
       const expected = `sha256=${createHmac("sha256", d.cfg.WHATSAPP_APP_SECRET).update(req.rawBody ?? "").digest("hex")}`;

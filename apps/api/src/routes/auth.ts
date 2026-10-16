@@ -6,6 +6,9 @@ import { z } from "zod";
 import type { Deps } from "../app.js";
 import { userAuth } from "../auth.js";
 
+// Checked against when the email is unknown, so both cases take the same time.
+const DUMMY_HASH = hashPassword("leksy-timing-equaliser");
+
 const Login = z.object({ email: z.email(), password: z.string().min(1) });
 const Signup = z.object({
   brandName: z.string().min(2).max(120),
@@ -19,7 +22,8 @@ export const authRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   app.post("/v1/auth/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req, reply) => {
     const body = Login.parse(req.body);
     const user = await d.db.query.users.findFirst({ where: eq(users.email, body.email.toLowerCase()) });
-    if (!user || !verifyPassword(body.password, user.passwordHash)) return reply.code(401).send({ error: "invalid_credentials" });
+    const ok = verifyPassword(body.password, user?.passwordHash ?? DUMMY_HASH);
+    if (!user || !ok) return reply.code(401).send({ error: "invalid_credentials" });
     const token = app.jwt.sign({ sub: user.id, brandId: user.brandId, role: user.role, storeCodes: user.storeCodes });
     return { token, user: { id: user.id, email: user.email, name: user.name, role: user.role } };
   });

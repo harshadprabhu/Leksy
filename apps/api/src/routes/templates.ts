@@ -2,11 +2,12 @@ import type { Bill } from "@leksy/bill-schema";
 import { billLinks, contextFor, renderHtml } from "@leksy/core";
 import { bills, templates, templateVersions } from "@leksy/core/db";
 import { buildContext, listFields, PRESETS, SAMPLE_BILL, SAMPLE_BRAND, SAMPLE_STORE, TemplateSchema } from "@leksy/template-engine";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import type { FastifyRequest } from "fastify";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import type { Deps } from "../app.js";
-import { brandOf, userAuth } from "../auth.js";
+import { brandOf, inScope, userAuth } from "../auth.js";
 
 const Create = z.object({
   key: z.string().regex(/^[a-z0-9-]{2,64}$/),
@@ -20,12 +21,14 @@ export const templateRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   const viewers = userAuth();
 
   /** Data for previews: a real bill of the brand, or the built-in sample. */
-  const previewContext = async (brandId: string, billId?: string) => {
-    if (billId) {
+  const previewContext = async (req: FastifyRequest, billId?: string) => {
+    const brandId = brandOf(req);
+    if (billId && /^[0-9a-f-]{36}$/i.test(billId)) {
       const bill = await d.db.query.bills.findFirst({ where: and(eq(bills.id, billId), eq(bills.brandId, brandId)) });
-      if (bill) return contextFor(d.db, brandId, bill.data as Bill, billLinks(d.cfg.PUBLIC_BASE_URL, bill.token));
+      if (bill && inScope(req, bill.storeCode)) return contextFor(d.db, brandId, bill.data as Bill, billLinks(d.cfg.PUBLIC_BASE_URL, bill.token));
     }
-    const latest = await d.db.query.bills.findFirst({ where: eq(bills.brandId, brandId), orderBy: desc(bills.issuedAt) });
+    const scope = req.principal?.storeCodes;
+    const latest = await d.db.query.bills.findFirst({ where: and(eq(bills.brandId, brandId), ...(scope?.length ? [inArray(bills.storeCode, scope)] : [])), orderBy: desc(bills.issuedAt) });
     if (latest) return contextFor(d.db, brandId, latest.data as Bill, billLinks(d.cfg.PUBLIC_BASE_URL, latest.token));
     return buildContext(SAMPLE_BILL, { brand: SAMPLE_BRAND, store: SAMPLE_STORE, links: billLinks(d.cfg.PUBLIC_BASE_URL, "SAMPLE") });
   };
@@ -95,13 +98,13 @@ export const templateRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
     const body = z.object({ template: z.unknown(), billId: z.uuid().optional() }).parse(req.body);
     const parsed = TemplateSchema.safeParse(body.template);
     if (!parsed.success) return reply.code(422).send({ error: "invalid_template", details: parsed.error.issues.slice(0, 20) });
-    const ctx = await previewContext(brandOf(req), body.billId);
+    const ctx = await previewContext(req, body.billId);
     return { html: await renderHtml(parsed.data, ctx, { title: "Preview" }) };
   });
 
   /** The data the studio's field picker shows, from the brand's latest bill. */
   app.get<{ Querystring: { billId?: string } }>("/v1/templates/fields", { preHandler: viewers }, async (req) => {
-    const ctx = await previewContext(brandOf(req), req.query.billId);
+    const ctx = await previewContext(req, req.query.billId);
     return { fields: listFields(ctx), context: ctx };
   });
 };

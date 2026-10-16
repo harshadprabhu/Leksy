@@ -35,8 +35,12 @@ PDFs come from headless Chromium in the API pods and are cached in Redis by bill
 - Passwords: scrypt. Sessions: 12-hour JWTs.
 - Public links: 22-character random tokens (≈131 bits), `noindex`, strict CSP with per-request nonces, no third-party scripts.
 - Templates are data, never HTML; every value is escaped and URLs/colours are whitelisted.
-- Outbound calls (pull connectors, webhooks) are https-only and blocked from private networks (SSRF guard), with timeouts and no redirects.
-- Rate limits on login, signup, ingestion, bill pages and feedback.
+- Outbound calls (pull connectors, webhooks) are https-only and blocked from private, loopback, link-local, reserved and IPv4-mapped/NAT64 addresses (SSRF guard). Every connection re-checks the address DNS returns, so a name cannot pass the check and then point inside the network (DNS rebinding). Timeouts, no redirects.
+- Credentials for a brand's API (tokens, passwords, custom auth headers) are encrypted at rest with AES-256-GCM under `LEKSY_SECRETS_KEY`.
+- Roles: owners and admins set the brand up; managers and viewers work with bills and feedback. A user limited to some stores sees only those stores' bills, tickets, analytics and Insights, and can only send bills for them. Only admins see integration keys.
+- Rate limits on login, signup, ingestion, bill pages and feedback. Client IPs come from `X-Forwarded-For` only when the request passed through a trusted proxy (`TRUST_PROXY`), so a client cannot reset its own limit.
+- Login takes the same time for unknown emails and wrong passwords. Invalid input gets a 400 with the problems, never a 500.
+- `apps/api/src/security.test.ts` covers tenant isolation, roles and store scopes, forged tokens, revoked keys, replayed signatures, SQL and XSS payloads, link schemes, SSRF address forms and rate limits.
 - Consent: bills with `customer.consent: false` are stored but never sent (DPDP).
 - Data residency: deploy in AWS `ap-south-1` (Mumbai).
 

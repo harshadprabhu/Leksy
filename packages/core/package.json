@@ -24,6 +24,7 @@
   "dependencies": {
     "@leksy/bill-schema": "workspace:*",
     "@leksy/mapper": "workspace:*",
+    "@leksy/survey": "workspace:*",
     "@leksy/template-engine": "workspace:*",
     "bullmq": "^5.56.0",
     "drizzle-orm": "^0.44.0",
@@ -31,8 +32,8 @@
     "nodemailer": "^7.0.5",
     "pg": "^8.16.0",
     "qrcode": "^1.5.4",
-    "zod": "^4.1.0",
-    "@leksy/survey": "workspace:*"
+    "undici": "6.23.0",
+    "zod": "^4.1.0"
   },
   "devDependencies": {
     "@types/nodemailer": "^6.4.17",

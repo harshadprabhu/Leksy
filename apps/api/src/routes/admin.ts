@@ -1,11 +1,16 @@
-import { generateApiKey, randomToken, summary, SurveySchema } from "@leksy/core";
+import { assertPublicUrl, generateApiKey, randomToken, summary, SurveySchema } from "@leksy/core";
 import { apiKeys, brands, feedback, stores, surveys, triggers, webhookEndpoints } from "@leksy/core/db";
 import { ConditionSchema } from "@leksy/template-engine";
 import { and, asc, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import type { Deps } from "../app.js";
-import { brandOf, userAuth } from "../auth.js";
+import { brandOf, inScope, userAuth } from "../auth.js";
+
+/** Links shown to customers or opened by the app: web pages only (no javascript: or file: links). */
+const WebUrl = z.url({ protocol: /^https?$/ });
+/** A logo may also be an embedded image. */
+const ImageUrl = z.union([WebUrl, z.string().max(2_000_000).regex(/^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/)]);
 
 const StoreBody = z.object({
   code: z.string().min(1).max(64),
@@ -18,7 +23,7 @@ const StoreBody = z.object({
   managerName: z.string().max(200).nullish(),
   managerPhone: z.string().max(32).nullish(),
   managerEmail: z.email().nullish(),
-  mapsUrl: z.url().nullish(),
+  mapsUrl: WebUrl.nullish(),
   active: z.boolean().optional(),
 });
 
@@ -45,10 +50,10 @@ export const adminRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
     const body = z
       .object({
         name: z.string().min(1).max(120).optional(),
-        logoUrl: z.url().nullish(),
-        website: z.url().nullish(),
+        logoUrl: ImageUrl.nullish(),
+        website: WebUrl.nullish(),
         supportPhone: z.string().max(32).nullish(),
-        googleReviewUrl: z.url().nullish(),
+        googleReviewUrl: WebUrl.nullish(),
         settings: z.record(z.string(), z.unknown()).optional(),
       })
       .parse(req.body);
@@ -84,7 +89,8 @@ export const adminRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
 
   // Surveys
   app.get("/v1/surveys", { preHandler: anyUser }, async (req) => ({ surveys: await d.db.query.surveys.findMany({ where: eq(surveys.brandId, brandOf(req)) }) }));
-  app.put<{ Params: { key: string } }>("/v1/surveys/:key", { preHandler: admin }, async (req) => {
+  app.put<{ Params: { key: string } }>("/v1/surveys/:key", { preHandler: admin }, async (req, reply) => {
+    if (!/^[a-z0-9-]{2,64}$/.test(req.params.key)) return reply.code(400).send({ error: "invalid_key" });
     const body = z
       .object({ name: z.string().min(1).max(120), body: SurveySchema, alertThreshold: z.number().int().min(0).max(5).default(2), reviewThreshold: z.number().int().min(1).max(6).default(4), slaMinutes: z.number().int().min(5).max(10_080).default(240) })
       .parse(req.body);
@@ -114,10 +120,11 @@ export const adminRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   });
   app.patch<{ Params: { id: string } }>("/v1/feedback/:id", { preHandler: userAuth(["owner", "admin", "manager"]) }, async (req, reply) => {
     const body = z.object({ ticketStatus: z.enum(["open", "in_progress", "resolved"]), resolutionNote: z.string().max(2000).optional() }).parse(req.body);
+    const scope = req.principal?.storeCodes;
     const [row] = await d.db
       .update(feedback)
       .set({ ...body, resolvedAt: body.ticketStatus === "resolved" ? sql`now()` : null })
-      .where(and(eq(feedback.id, req.params.id), eq(feedback.brandId, brandOf(req))))
+      .where(and(eq(feedback.id, req.params.id), eq(feedback.brandId, brandOf(req)), ...(scope?.length ? [inArray(feedback.storeCode, scope)] : [])))
       .returning();
     return row ?? reply.code(404).send({ error: "not_found" });
   });
@@ -127,6 +134,8 @@ export const adminRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
     const q = z.object({ from: z.iso.date().optional(), to: z.iso.date().optional(), store: z.string().optional() }).parse(req.query);
     const to = q.to ? new Date(`${q.to}T23:59:59.999+05:30`) : new Date();
     const from = q.from ? new Date(`${q.from}T00:00:00+05:30`) : new Date(to.getTime() - 30 * 864e5);
+    // A store-limited user asking for another store gets nothing, not that store's figures.
+    if (q.store && !inScope(req, q.store)) return summary(d.db, brandOf(req), from, to, ["\u0001no-store"]);
     const scope = q.store ? [q.store] : (req.principal?.storeCodes ?? undefined);
     return summary(d.db, brandOf(req), from, to, scope ?? undefined);
   });
@@ -154,7 +163,12 @@ export const adminRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
     webhooks: (await d.db.query.webhookEndpoints.findMany({ where: eq(webhookEndpoints.brandId, brandOf(req)) })).map(({ secret: _s, ...w }) => w),
   }));
   app.post("/v1/webhooks", { preHandler: admin }, async (req, reply) => {
-    const body = z.object({ url: z.url(), events: z.array(z.string()).min(1).default(["*"]) }).parse(req.body);
+    const body = z.object({ url: WebUrl, events: z.array(z.string().max(64)).min(1).max(20).default(["*"]) }).parse(req.body);
+    try {
+      await assertPublicUrl(body.url, d.cfg.ALLOW_PRIVATE_URLS);
+    } catch (e) {
+      return reply.code(400).send({ error: "invalid_url", message: (e as Error).message });
+    }
     const secret = `whsec_${randomToken(32)}`;
     const [row] = await d.db.insert(webhookEndpoints).values({ ...body, secret, brandId: brandOf(req) }).returning();
     return reply.code(201).send({ ...row, secret, note: "Verify X-Leksy-Signature with this secret." });

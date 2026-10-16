@@ -10,6 +10,12 @@ const Env = z.object({
   /** Public base URL for bill links, e.g. https://lks.y or https://bills.leksy.in */
   PUBLIC_BASE_URL: z.string().default("http://localhost:4000"),
   WEB_ORIGIN: z.string().default("http://localhost:3000"),
+  /**
+   * Proxies whose X-Forwarded-For is believed (client IPs drive rate limits).
+   * Default: proxies on loopback and private networks only, so a client on the
+   * internet cannot claim another IP.
+   */
+  TRUST_PROXY: z.string().default("loopback,linklocal,uniquelocal"),
   JWT_SECRET: z.string().min(32).default("dev-only-secret-change-me-dev-only-secret"),
   COOKIE_SECRET: z.string().min(32).default("dev-only-cookie-secret-change-me-0000000"),
   CHROMIUM_PATH: z.string().optional(),

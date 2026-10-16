@@ -32,7 +32,22 @@ export const auth = {
       localStorage.removeItem("lx_token");
     } catch {}
   },
+  /** The signed-in user's role, read from the token (the API still checks every request). */
+  get role(): "owner" | "admin" | "manager" | "viewer" | null {
+    if (DEMO) return "owner";
+    const t = this.token;
+    if (!t) return null;
+    try {
+      const b64 = t.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/");
+      return (JSON.parse(atob(b64)) as { role?: "owner" | "admin" | "manager" | "viewer" }).role ?? null;
+    } catch {
+      return null;
+    }
+  },
 };
+
+/** Owners and admins set the brand up; managers and viewers work with bills and feedback. */
+export const isAdmin = () => ["owner", "admin"].includes(auth.role ?? "");
 
 export async function api<T = unknown>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   if (DEMO) {
