@@ -7,6 +7,7 @@
 - **Template Studio:** a no-code designer. Drag blocks, bind fields from real bills, add show/hide rules, preview, publish.
 - **Mission Happiness:** branching survey inside the bill, low-score alerts to the store manager with an SLA, Google-review prompt for happy customers.
 - **Analytics:** delivery, opens, ratings, NPS, store league table and improvement themes.
+- **Insights:** ask questions in plain English, forecast sales with festival-aware models, and download a PowerPoint pre-read in the company's look. Runs locally; an optional local language model (Ollama) or, only if an admin allows it, an external copilot can add more help. See [docs/insights.md](docs/insights.md).
 
 ## Live demo
 

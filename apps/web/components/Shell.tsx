@@ -7,6 +7,7 @@ import { resetDemo } from "@/lib/demo";
 
 const NAV = [
   ["/", "Dashboard"],
+  ["/insights", "Insights"],
   ["/bills", "Bills"],
   ["/feedback", "Mission Happiness"],
   ["/surveys", "Survey editor"],

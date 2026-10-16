@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { AiSettingsCard, DeckSettingsCard } from "@/components/insights/AiSettingsCards";
 import { Shell } from "@/components/Shell";
 import { api, dt } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
@@ -10,6 +11,7 @@ interface Brand {
   website: string | null;
   supportPhone: string | null;
   googleReviewUrl: string | null;
+  settings?: Record<string, unknown>;
 }
 interface Store {
   id: string;
@@ -140,6 +142,12 @@ export default function Settings() {
           </form>
         </div>
       </div>
+      {me.data && (
+        <div className="grid two" style={{ marginTop: 14 }}>
+          <AiSettingsCard settings={me.data.brand.settings ?? {}} onSaved={() => void me.reload()} />
+          <DeckSettingsCard settings={me.data.brand.settings ?? {}} company={me.data.brand.name} onSaved={() => void me.reload()} />
+        </div>
+      )}
       <div className="card stack" style={{ marginTop: 14 }}>
         <h2>Stores</h2>
         <table className="t">

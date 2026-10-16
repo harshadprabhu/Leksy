@@ -8,6 +8,7 @@
 import { BillSchema, validateBill, type Bill } from "@leksy/bill-schema";
 import { applyMapping, samplePaths, suggestMapping, type Mapping } from "@leksy/mapper";
 import { cleanAnswers, MISSION_HAPPINESS, SurveySchema, type Survey } from "@leksy/survey";
+import type { Dataset, DayRow } from "@leksy/insights";
 import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type Condition, type Template } from "@leksy/template-engine";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -451,6 +452,119 @@ function summary(s: DemoState, from: Date, to: Date) {
   };
 }
 
+// ---------- Insights dataset ----------
+
+const DIWALI_ETC = ["2024-05-10", "2024-10-29", "2024-11-01", "2025-04-30", "2025-10-18", "2025-10-20", "2026-04-20"];
+const istDate = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10);
+
+/**
+ * Daily aggregates for Insights: two years of store history (generated with
+ * realistic seasonality: weekends, Akshaya Tritiya, Dhanteras/Diwali, wedding
+ * season, 12% yearly growth) followed by the demo's real bills for the last 30 days.
+ */
+function demoDataset(s: DemoState): Dataset {
+  const asOf = istDate(new Date().toISOString());
+  const detailFrom = new Date(Date.parse(`${asOf}T00:00:00Z`) - 29 * DAY).toISOString().slice(0, 10);
+  const rand = rng(7);
+  const fbBy = new Map(s.feedback.map((f) => [f.billId, f]));
+  const mood: Record<string, number> = { "BLR-INDIRANAGAR": 4.2, "MUM-BANDRA": 3.1, "DEL-KHAN-MARKET": 4.6, "HYD-JUBILEE": 3.9 };
+  const days: DayRow[] = [];
+
+  // Real recent bills, by day and store.
+  const recent = new Map<string, DayRow>();
+  for (const b of s.bills) {
+    const date = istDate(b.issuedAt);
+    if (date < detailFrom) continue;
+    const k = `${date}|${b.storeCode}`;
+    const r = recent.get(k) ?? { date, store: b.storeCode, revenue: 0, bills: 0, ratingSum: 0, ratingCount: 0, promoters: 0, detractors: 0, npsCount: 0 };
+    r.revenue += Number(b.total);
+    r.bills += 1;
+    const f = fbBy.get(b.id);
+    if (f) {
+      r.ratingSum += f.rating;
+      r.ratingCount += 1;
+      if (f.nps != null) {
+        r.npsCount += 1;
+        if (f.nps >= 9) r.promoters += 1;
+        if (f.nps <= 6) r.detractors += 1;
+      }
+    }
+    recent.set(k, r);
+  }
+  // Each store's recent daily average anchors the generated history.
+  const avgRecent = new Map<string, number>();
+  for (const st of s.stores) {
+    const rows = [...recent.values()].filter((r) => r.store === st.code);
+    avgRecent.set(st.code, Math.max(80000, rows.reduce((a, r) => a + r.revenue, 0) / 30));
+  }
+  const start = Date.parse(`${asOf}T00:00:00Z`) - 760 * DAY;
+  for (let t = start; ; t += DAY) {
+    const date = new Date(t).toISOString().slice(0, 10);
+    if (date >= detailFrom) break;
+    const yearsBack = (Date.parse(`${asOf}T00:00:00Z`) - t) / (365 * DAY);
+    const dow = new Date(t).getUTCDay();
+    const month = Number(date.slice(5, 7));
+    const near = DIWALI_ETC.map((d) => (Date.parse(`${d}T00:00:00Z`) - t) / DAY).find((x) => x >= -1 && x <= 3);
+    const festival = near === undefined ? 1 : 2.2 + (3 - near) * 0.4;
+    const wedding = [11, 12, 1, 2, 4, 5, 6].includes(month) ? 1.25 : [7, 8].includes(month) ? 0.82 : 1;
+    const weekend = dow === 0 || dow === 6 ? 1.35 : dow === 2 ? 0.85 : 1;
+    for (const st of s.stores) {
+      const base = (avgRecent.get(st.code) ?? 150000) / Math.pow(1.12, yearsBack);
+      const revenue = Math.round(base * festival * wedding * weekend * (0.8 + rand() * 0.4));
+      const bills = Math.max(1, Math.round(revenue / (95000 + rand() * 30000)));
+      const responses = Math.round(bills * 0.35 * (0.6 + rand() * 0.8));
+      const m = (mood[st.code] ?? 4) - (festival > 1 && st.code === "MUM-BANDRA" ? 0.4 : 0);
+      const ratingSum = Math.round(responses * Math.min(5, Math.max(1, m + (rand() - 0.5) * 0.6)));
+      const promoters = Math.round(responses * Math.max(0, (m - 3) / 2) * 0.8);
+      const detractors = Math.round(responses * Math.max(0, (4 - m) / 3) * 0.6);
+      days.push({ date, store: st.code, revenue, bills, ratingSum, ratingCount: responses, promoters, detractors, npsCount: responses });
+    }
+  }
+  days.push(...recent.values());
+
+  // Bill-level breakdowns for the last 30 days.
+  const staff = new Map<string, Dataset["staff"][number]>();
+  const cats = new Map<string, { category: string; revenue: number; units: number }>();
+  for (const b of s.bills) {
+    if (istDate(b.issuedAt) < detailFrom) continue;
+    const st = b.data.staff;
+    if (st) {
+      const k = `${st.id}|${b.storeCode}`;
+      const row = staff.get(k) ?? { id: st.id, name: st.name ?? st.id, store: b.storeCode, bills: 0, revenue: 0, ratingSum: 0, ratingCount: 0 };
+      row.bills += 1;
+      row.revenue += Number(b.total);
+      const f = fbBy.get(b.id);
+      if (f) {
+        row.ratingSum += f.rating;
+        row.ratingCount += 1;
+      }
+      staff.set(k, row);
+    }
+    for (const it of b.data.items) {
+      const c = it.category ?? "Other";
+      const row = cats.get(c) ?? { category: c, revenue: 0, units: 0 };
+      row.revenue += it.qty * it.unit_price - it.discount;
+      row.units += it.qty;
+      cats.set(c, row);
+    }
+  }
+  const themes = new Map<string, number>();
+  for (const f of s.feedback) {
+    if (istDate(f.createdAt) < detailFrom) continue;
+    for (const o of (f.answers.improve as string[] | undefined) ?? []) themes.set(o, (themes.get(o) ?? 0) + 1);
+  }
+  return {
+    brand: s.brand.name,
+    asOf,
+    stores: s.stores.map((x) => ({ code: x.code, name: x.name, city: x.city })),
+    days,
+    detailDays: 30,
+    staff: [...staff.values()],
+    categories: [...cats.values()],
+    themes: [...themes].map(([option, count]) => ({ option, count })).sort((a, b) => b.count - a.count),
+  };
+}
+
 // ---------- request router ----------
 
 class DemoError extends Error {
@@ -653,6 +767,7 @@ function route(s: DemoState, method: string, seg: string[], q: URLSearchParams, 
     return { webhooks: s.webhooks };
   }
 
+  if (res === "insights") return demoDataset(s);
   if (res === "surveys") {
     if (M === "PUT" && rid) {
       const parsed = SurveySchema.safeParse(body.body);

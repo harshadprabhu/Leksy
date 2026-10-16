@@ -8,11 +8,11 @@ const nextConfig = demo
       output: "export",
       basePath,
       trailingSlash: true,
-      transpilePackages: ["@leksy/template-engine", "@leksy/bill-schema", "@leksy/mapper", "@leksy/survey"],
+      transpilePackages: ["@leksy/template-engine", "@leksy/bill-schema", "@leksy/mapper", "@leksy/survey", "@leksy/insights"],
     }
   : {
       output: "standalone",
-      transpilePackages: ["@leksy/template-engine", "@leksy/bill-schema", "@leksy/mapper", "@leksy/survey"],
+      transpilePackages: ["@leksy/template-engine", "@leksy/bill-schema", "@leksy/mapper", "@leksy/survey", "@leksy/insights"],
       poweredByHeader: false,
     };
 export default nextConfig;

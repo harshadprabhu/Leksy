@@ -13,6 +13,7 @@ import { authRoutes } from "./routes/auth.js";
 import { billRoutes } from "./routes/bills.js";
 import { connectorRoutes } from "./routes/connectors.js";
 import { ingestRoutes } from "./routes/ingest.js";
+import { insightsRoutes } from "./routes/insights.js";
 import { providerRoutes } from "./routes/providers.js";
 import { publicRoutes } from "./routes/public.js";
 import { templateRoutes } from "./routes/templates.js";
@@ -66,6 +67,7 @@ export async function buildApp(deps: Deps): Promise<FastifyInstance> {
   await app.register(templateRoutes(deps));
   await app.register(connectorRoutes(deps));
   await app.register(adminRoutes(deps));
+  await app.register(insightsRoutes(deps));
   await app.register(publicRoutes(deps));
   await app.register(providerRoutes(deps));
   return app;

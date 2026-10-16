@@ -165,6 +165,15 @@ describe.skipIf(!DB_URL)("Leksy API", () => {
     expect(r.json().html).toContain("Test Jewels");
   });
 
+  it("serves Insights aggregates without customer fields", async () => {
+    const r = await app.inject({ method: "GET", url: "/v1/insights/dataset", headers: { authorization: `Bearer ${jwt}` } });
+    expect(r.statusCode).toBe(200);
+    const ds = r.json();
+    expect(ds.days.length).toBeGreaterThan(0);
+    expect(ds.days[0]).toHaveProperty("revenue");
+    expect(JSON.stringify(ds)).not.toContain("+9198");
+  });
+
   it("keeps tenants apart", async () => {
     const other = await createBrand(db, { name: "Other", slug: "other", ownerEmail: "o@other.in", ownerPassword: "another-long-password" });
     const login = await app.inject({ method: "POST", url: "/v1/auth/login", payload: { email: "o@other.in", password: "another-long-password" } });
