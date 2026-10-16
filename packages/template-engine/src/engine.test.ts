@@ -53,7 +53,7 @@ describe("rendering", () => {
   });
 
   it("hides blocks whose condition fails, but shows them dimmed in the editor", () => {
-    const t = TemplateSchema.parse({ blocks: [{ id: "x", type: "text", props: { text: "hi" }, visibleIf: { field: "nope", op: "exists" } }] });
+    const t = TemplateSchema.parse({ page: { poweredBy: false }, blocks: [{ id: "x", type: "text", props: { text: "hi" }, visibleIf: { field: "nope", op: "exists" } }] });
     expect(renderTemplate(t, {})).not.toContain("hi");
     expect(renderTemplate(t, {}, { editor: true })).toContain('data-block-id="x"');
   });
@@ -155,5 +155,15 @@ describe("ornament divider", () => {
     const html = renderTemplate(TemplateSchema.parse({ blocks: [{ id: "d", type: "divider", props: { style: "ornament" } }] }), ctx);
     expect(html).toContain('class="lx-ornament"');
     expect(html).toContain('d="M12 5h16l8 8-16 16L4 13z"');
+  });
+});
+
+describe("powered by Leksy", () => {
+  it("adds the small Leksy logo at the foot of every bill, above a pinned contact bar", () => {
+    const t = TemplateSchema.parse({ blocks: [{ id: "t", type: "text", props: { text: "Hi" } }, { id: "bar", type: "contact_bar", props: {} }] });
+    const html = renderTemplate(t, ctx);
+    expect(html).toContain('Powered by <img src="data:image/png;base64,');
+    expect(html.indexOf("lx-powered")).toBeLessThan(html.indexOf("lx-contact-bar"));
+    expect(renderTemplate({ ...t, page: { ...t.page, poweredBy: false } }, ctx)).not.toContain("lx-powered");
   });
 });

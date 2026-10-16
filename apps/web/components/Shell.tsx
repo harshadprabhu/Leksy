@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { LeksyLogo, PoweredByLeksy } from "./LeksyLogo";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, auth, DEMO } from "@/lib/api";
@@ -134,11 +135,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <div className="brand-logo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={sideLogo} alt={kit!.name} />
-            <small>powered by Leksy</small>
+            <small>
+              <PoweredByLeksy light={!!kit?.ui} />
+            </small>
           </div>
         ) : (
           <div className="logo">
-            LEKSY<small>e-bills · happiness</small>
+            <LeksyLogo height={34} />
+            <small>e-bills · happiness</small>
           </div>
         )}
         {NAV.map(([href, label]) => (

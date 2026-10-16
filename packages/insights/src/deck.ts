@@ -6,6 +6,7 @@
  * document properties, no null chart values, inside-only labels on stacked charts.
  */
 import type * as PptxModule from "pptxgenjs";
+import { LEKSY_LOGO, LEKSY_LOGO_LIGHT, LEKSY_LOGO_RATIO } from "./leksy-logo.js";
 import { REGIONS, regionOf, type Region } from "./calendar.js";
 import { addDays, categoriesFor, groupTotals, inRange, themesFor, totals, type Dataset } from "./dataset.js";
 import { forecast, toWeekly } from "./forecast.js";
@@ -80,6 +81,9 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
       { text: { text: `${theme.company} · ${theme.footer}`, options: { x: 0.5, y: 7.0, w: 9, h: 0.3, fontFace: BF, fontSize: 9, color: MUTED, isTextBox: true } } },
       ...(mark ? [{ image: { ...src(mark), x: 4.17, y: 1.9, w: 5.0, h: 3.7, sizing: { type: "contain" as const, w: 5.0, h: 3.7 }, transparency: 93 } }] : []),
       ...(logoOpts(11.4, 0.35, 0.45) ? [{ image: logoOpts(11.4, 0.35, 0.45)! }] : []),
+      // Powered by Leksy, small, beside the slide number.
+      { text: { text: "Powered by", options: { x: 9.9, y: 7.0, w: 0.95, h: 0.3, fontFace: BF, fontSize: 8, color: MUTED, align: "right", margin: 0, isTextBox: true } } },
+      { image: { data: LEKSY_LOGO, x: 10.92, y: 7.03, h: 0.24, w: 0.24 * LEKSY_LOGO_RATIO } },
     ],
     slideNumber: { x: 12.4, y: 7.0, w: 0.5, h: 0.3, fontFace: BF, fontSize: 9, color: MUTED },
   });
@@ -136,7 +140,9 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
         s.addText(l, { x: 0.7 + i * 3.0, y: 5.4, w: 2.8, h: 0.35, fontFace: BF, fontSize: 12, color: "D1D5DB", margin: 0, isTextBox: true });
       });
     }
-    s.addText(`Data to ${dd(ds.asOf)} · generated on-device by Leksy`, { x: 0.7, y: 6.7, w: 11, h: 0.35, fontFace: BF, fontSize: 11, color: "9CA3AF", margin: 0, isTextBox: true });
+    s.addText(`Data to ${dd(ds.asOf)} · generated on-device`, { x: 0.7, y: 6.7, w: 7, h: 0.35, fontFace: BF, fontSize: 11, color: "9CA3AF", margin: 0, isTextBox: true });
+    s.addText("Powered by", { x: 9.6, y: 6.7, w: 1.45, h: 0.35, fontFace: BF, fontSize: 11, color: "9CA3AF", align: "right", margin: 0, isTextBox: true });
+    s.addImage({ data: LEKSY_LOGO_LIGHT, x: 11.12, y: 6.66, h: 0.42, w: 0.42 * LEKSY_LOGO_RATIO });
   }
 
   // ---- 2. Scorecard ----

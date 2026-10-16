@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { LeksyLogo } from "@/components/LeksyLogo";
 import { useState } from "react";
 import { api, auth } from "@/lib/api";
 
@@ -47,6 +48,9 @@ export default function Signup() {
           }
         }}
       >
+        <div style={{ textAlign: "center" }}>
+          <LeksyLogo height={44} />
+        </div>
         <h2>Create your Leksy account</h2>
         <label className="f">
           Brand name

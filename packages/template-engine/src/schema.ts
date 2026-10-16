@@ -138,6 +138,8 @@ export const PageSchema = z.object({
   fontFamily: z.string().max(80).default("Inter"),
   headingFontFamily: z.string().max(80).default("Cormorant Garamond"),
   padding: z.number().min(0).max(80).default(24),
+  /** A small "Powered by Leksy" logo at the foot of the bill and its PDF. */
+  poweredBy: z.boolean().default(true),
   /** A faint brand mark repeated down the page (bill, PDF and every printed page). */
   watermark: z
     .object({

@@ -1,5 +1,6 @@
 "use client";
 import { useSearchParams } from "next/navigation";
+import { LeksyLogo } from "@/components/LeksyLogo";
 import { Suspense } from "react";
 import { DEMO } from "@/lib/api";
 import { findBillByToken, load } from "@/lib/demo";
@@ -25,7 +26,10 @@ function Verify() {
               <br />
               Total ₹{Number(bill.total).toLocaleString("en-IN")}
             </div>
-            <p className="small muted">Issued through Leksy. The bill&apos;s contents match what the store sent.</p>
+            <p className="small muted">The bill&apos;s contents match what the store sent.</p>
+            <div className="small muted verify-by">
+              Issued and secured by <LeksyLogo height={18} />
+            </div>
           </>
         ) : (
           <h2>Not a valid Leksy bill</h2>

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { LeksyLogo } from "@/components/LeksyLogo";
 import { api, auth, DEMO } from "@/lib/api";
 
 export default function Login() {
@@ -33,7 +34,8 @@ export default function Login() {
         }}
       >
         <div className="logo" style={{ padding: 0, textAlign: "center" }}>
-          LEKSY<small>sign in</small>
+          <LeksyLogo height={44} />
+          <small>sign in</small>
         </div>
         <label className="f">
           Email

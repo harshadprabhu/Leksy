@@ -1,4 +1,5 @@
 import { allBindingsEmpty, evaluate, getAll, getPath, interpolate, type Ctx } from "./expr.js";
+import { LEKSY_LOGO } from "./leksy-logo.js";
 import type { Block, Condition, Style, Template } from "./schema.js";
 
 export interface RenderOptions {
@@ -380,6 +381,8 @@ export function templateCss(t: Template): string {
 .lx-buttons .lx-button{flex:1;text-align:center}
 .lx-wm{position:absolute;inset:0;pointer-events:none;background-repeat:no-repeat;background-position:center 38%;z-index:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .lx-page>.lx-block{position:relative;z-index:1}
+.lx-powered{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:5px;margin:18px 0 2px;font-size:9.5px;letter-spacing:.4px;color:${muted};opacity:.85}
+.lx-powered img{height:16px;width:auto;display:block}
 .lx-page h1,.lx-page h2,.lx-page h3{font-family:'${heading}',serif;margin:0;font-weight:500;line-height:1.2}
 .lx-page h1{font-size:28px}.lx-page h2{font-size:22px}.lx-page h3{font-size:17px}
 .lx-page p{margin:0}
@@ -423,8 +426,16 @@ export function renderTemplate(t: Template, ctx: Ctx, opts: RenderOptions = {}):
   const wm = t.page.watermark;
   const src = wm ? safeUrl(interpolate(wm.src, ctx)) : undefined;
   const mark = wm && src ? `<div class="lx-wm" aria-hidden="true" style="background-image:url('${src}');background-size:${wm.size}% auto;opacity:${wm.opacity}"></div>` : "";
-  return `<div class="lx-page">${mark}${t.blocks.map((b) => renderBlock(b, ctx, opts)).join("")}</div>`;
+  const blocks = t.blocks.map((b) => renderBlock(b, ctx, opts));
+  if (t.page.poweredBy) {
+    // Above a contact bar, which stays pinned to the bottom of the screen.
+    const at = t.blocks[t.blocks.length - 1]?.type === "contact_bar" ? blocks.length - 1 : blocks.length;
+    blocks.splice(at, 0, POWERED_BY);
+  }
+  return `<div class="lx-page">${mark}${blocks.join("")}</div>`;
 }
+
+const POWERED_BY = `<div class="lx-powered">Powered by <img src="${LEKSY_LOGO}" alt="Leksy" width="48" height="16"></div>`;
 
 const GOOGLE_FONTS = new Set(["Inter", "Cormorant Garamond", "Playfair Display", "Lora", "Montserrat", "Poppins", "Marcellus", "Cinzel", "DM Serif Display", "Noto Sans", "Noto Serif Devanagari", "Red Hat Display", "Nunito", "Figtree"]);
 

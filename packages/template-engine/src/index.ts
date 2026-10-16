@@ -4,3 +4,4 @@ export * from "./render.js";
 export * from "./context.js";
 export * from "./presets.js";
 export * from "./samples.js";
+export * from "./leksy-logo.js";
