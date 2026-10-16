@@ -9,7 +9,7 @@ const demoKit = DEMO ? ORRA_PACK.kit : null;
 
 export const metadata: Metadata = {
   title: demoKit ? `${demoKit.name} · powered by Leksy` : "Leksy",
-  description: demoKit ? `${demoKit.name}: digital bills, customer happiness and retail analytics` : "Luxury digital bills, Mission Happiness and retail analytics",
+  description: demoKit ? `${demoKit.name}: digital bills, customer happiness and retail analytics` : "Luxury digital bills, Project WOW and retail analytics",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

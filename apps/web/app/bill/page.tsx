@@ -46,8 +46,6 @@ function BillView() {
   const [html, setHtml] = useState<string | null>(null);
   const [height, setHeight] = useState(900);
   const [look, setLook] = useState<{ bg: string; accent: string; font: string }>({ bg: "#fff", accent: "#2a2118", font: "inherit" });
-  const [locked, setLocked] = useState(false);
-  const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<"download" | "share" | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -60,14 +58,6 @@ function BillView() {
     const bill = findBillByToken(t);
     if (!bill) {
       setErr("Bill not found");
-      return;
-    }
-    let unlocked = true;
-    try {
-      unlocked = !bill.otpLock || sessionStorage.getItem(`lx_otp_${t}`) === "ok";
-    } catch {}
-    if (!unlocked) {
-      setLocked(true);
       return;
     }
     void (async () => {
@@ -107,7 +97,7 @@ function BillView() {
       if (wantsPdf) void download();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, locked]);
+  }, [t]);
 
   const download = async () => {
     if (!pdf.current) return;
@@ -168,29 +158,6 @@ function BillView() {
 
   if (!DEMO) return <div className="empty">Bills are served by the Leksy API at /b/&lt;token&gt;.</div>;
   if (err) return <div className="empty">{err}</div>;
-  if (locked)
-    return (
-      <div className="auth">
-        <div className="card stack" style={{ textAlign: "center" }}>
-          <h2>This bill is protected</h2>
-          <p className="muted small">High-value bills ask for a one-time code sent to the customer&apos;s phone. In this demo the code is 123456.</p>
-          <input inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} style={{ fontSize: 22, letterSpacing: 8, textAlign: "center" }} />
-          <button
-            className="btn primary"
-            onClick={() => {
-              if (code === "123456") {
-                try {
-                  sessionStorage.setItem(`lx_otp_${t}`, "ok");
-                } catch {}
-                setLocked(false);
-              } else alert("That code did not match.");
-            }}
-          >
-            Open bill
-          </button>
-        </div>
-      </div>
-    );
   if (!html) return <div className="empty">Loading your bill…</div>;
   return (
     <div className="ebill" style={{ "--eb-accent": look.accent, "--eb-bg": look.bg, fontFamily: `'${look.font}', var(--app-font)` } as React.CSSProperties}>

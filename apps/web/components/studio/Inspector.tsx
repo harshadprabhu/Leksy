@@ -237,7 +237,7 @@ function PropsEditor({ block, setProps }: { block: Block; setProps: (p: Record<s
           <F label="Survey title">
             <BoundInput value={block.props.title} onChange={(title) => setProps({ title })} />
           </F>
-          <div className="small muted">Questions come from the survey chosen in the trigger (Mission Happiness by default).</div>
+          <div className="small muted">Questions come from the survey chosen in the trigger (Project WOW by default).</div>
         </div>
       );
     case "social_links":

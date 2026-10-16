@@ -139,11 +139,28 @@ describe.skipIf(!DB_URL)("Leksy API", () => {
     expect(verify.body).toContain("Genuine bill");
   });
 
+  it("asks Project WOW once, at a tap, with no code needed to open the bill", async () => {
+    const created = await post("/v1/bills", bill("INV-WOW"));
+    const token = created.json().url.split("/").pop();
+    const page = await app.inject({ method: "GET", url: `/b/${token}` });
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('id="lx-wow"');
+    expect(page.body).not.toContain('id="lx-survey"');
+    const fb = await app.inject({ method: "POST", url: `/b/${token}/feedback`, payload: { answers: { overall: 5 } } });
+    expect(fb.statusCode).toBe(200);
+    const again = await app.inject({ method: "POST", url: `/b/${token}/feedback`, payload: { answers: { overall: 1 } } });
+    expect(again.statusCode).toBe(409);
+    const reopened = await app.inject({ method: "GET", url: `/b/${token}` });
+    expect(reopened.body).not.toContain('id="lx-wow"');
+    expect((await app.inject({ method: "GET", url: `/b/${token}/json` })).statusCode).toBe(200);
+  });
+
   it("uses a survey edited in the dashboard, with its own alert threshold", async () => {
     const list = await app.inject({ method: "GET", url: "/v1/surveys", headers: { authorization: `Bearer ${jwt}` } });
-    const mh = list.json().surveys.find((x: { key: string }) => x.key === "mission-happiness");
-    const body = { ...mh.body, questions: [...mh.body.questions, { id: "occasion", type: "choice", label: "What was the occasion?", options: ["Wedding", "Gift"] }] };
-    const saved = await app.inject({ method: "PUT", url: "/v1/surveys/mission-happiness", headers: { authorization: `Bearer ${jwt}` }, payload: { name: "Mission Happiness", body, alertThreshold: 3, reviewThreshold: 5, slaMinutes: 60 } });
+    const mh = list.json().surveys.find((x: { key: string }) => x.key === "project-wow");
+    // A full survey this time: the extra question is asked under the faces.
+    const body = { ...mh.body, oneTap: false, questions: [...mh.body.questions, { id: "occasion", type: "choice", label: "What was the occasion?", options: ["Wedding", "Gift"] }] };
+    const saved = await app.inject({ method: "PUT", url: "/v1/surveys/project-wow", headers: { authorization: `Bearer ${jwt}` }, payload: { name: "Project WOW", body, alertThreshold: 3, reviewThreshold: 5, slaMinutes: 60 } });
     expect(saved.statusCode).toBe(200);
 
     const created = await post("/v1/bills", bill("INV-SV"));

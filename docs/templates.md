@@ -14,7 +14,7 @@ A template is JSON: page settings plus a list of blocks. Brands edit it in **Tem
 | `totals` | Subtotal, discount, each tax, charges, round-off, grand total, payment modes |
 | `certificates` | Every certificate on every item, with "View" links |
 | `qr` | QR of any value; defaults to the bill's verification link |
-| `survey` | The Mission Happiness survey (interactive on the bill page) |
+| `survey` | The Project WOW survey (interactive on the bill page) |
 | `download_buttons` | PDF / data download |
 | `button`, `social_links`, `divider`, `spacer` | Layout and links |
 | `columns` | Side-by-side layout (1–4 columns) holding other blocks |

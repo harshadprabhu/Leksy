@@ -237,6 +237,8 @@ function renderBlock(block: Block, ctx: Ctx, opts: RenderOptions): string {
     }
     case "survey": {
       const inner = opts.surveySlot ? opts.surveySlot(interpolate(block.props.title, ctx)) : `<div class="lx-placeholder">${text(block.props.title, ctx)} · ★★★★★</div>`;
+      // A one-tap survey that was already answered leaves no gap behind.
+      if (!inner && !opts.editor) return "";
       return wrap(block, inner, opts);
     }
     case "social_links": {

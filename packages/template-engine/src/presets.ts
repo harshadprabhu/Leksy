@@ -8,6 +8,7 @@ const luxe: TemplateInput = {
     { id: "brand", type: "heading", props: { text: "{{brand.name}}", level: 1 }, style: { align: "center", letterSpacing: 2 } },
     { id: "thanks", type: "text", props: { text: "Thank you, {{customer.name | default:'dear guest'}}" }, style: { align: "center", italic: true, color: "#8a7a66" } },
     { id: "d1", type: "divider", props: { thickness: 1, style: "solid" }, style: { color: "#b08d57" } },
+    { id: "survey", type: "survey", props: { title: "How was your visit, {{customer.name | default:'friend'}}?" }, style: { marginTop: 16 } },
     {
       id: "meta",
       type: "kv_list",
@@ -57,7 +58,6 @@ const luxe: TemplateInput = {
       visibleIf: { field: "loyalty.points_earned", op: "exists" },
       style: { align: "center", fontSize: 12, color: "#8a7a66" },
     },
-    { id: "survey", type: "survey", props: { title: "How was your visit, {{customer.name | default:'friend'}}?" }, style: { marginTop: 16 } },
     { id: "dl", type: "download_buttons", props: { formats: ["pdf", "share"] } },
     { id: "qr", type: "qr", props: { value: "{{links.verify}}", size: 96, caption: "Scan to verify this bill" }, style: { align: "center", marginTop: 12 } },
     { id: "foot", type: "text", props: { text: "{{store.address}}{{store.city | prefix:', '}}\n{{store.gstin | prefix:'GSTIN '}}\n{{store.phone}}" }, style: { align: "center", fontSize: 11, color: "#8a7a66", marginTop: 12 } },
@@ -70,6 +70,7 @@ const classic: TemplateInput = {
   blocks: [
     { id: "brand", type: "heading", props: { text: "{{brand.name}}", level: 2 }, style: { align: "center" } },
     { id: "store", type: "text", props: { text: "{{store.name}}\n{{store.address}}" }, style: { align: "center", fontSize: 12 } },
+    { id: "survey", type: "survey", props: { title: "Rate your experience" } },
     { id: "meta", type: "kv_list", props: { rows: [{ label: "Invoice", value: "{{invoice_no}}" }, { label: "Date", value: "{{issued_at | datetime}}" }, { label: "Customer", value: "{{customer.name}}" }] } },
     {
       id: "items",
@@ -85,7 +86,6 @@ const classic: TemplateInput = {
       },
     },
     { id: "totals", type: "totals", props: { showTaxBreakup: true, showPayments: true, grandTotalLabel: "Total" } },
-    { id: "survey", type: "survey", props: { title: "Rate your experience" } },
     { id: "dl", type: "download_buttons", props: { formats: ["pdf", "share"] } },
   ],
 };

@@ -40,7 +40,7 @@ export default function Feedback() {
   return (
     <Shell>
       <PageHero
-        kicker="Mission Happiness"
+        kicker="Project WOW"
         title="How your customers feel"
         sub="Every response from the bill, with unhappy customers turned into tickets for the store team."
         stats={

@@ -4,7 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import QRCode from "qrcode";
 import { canonicalJson, sha256 } from "../crypto.js";
 import { brands, stores, templates, templateVersions, type Db } from "../db/index.js";
-import { MISSION_HAPPINESS, SurveySchema, type Survey } from "../survey.js";
+import { PROJECT_WOW, SurveySchema, type Survey } from "../survey.js";
 import { surveys } from "../db/index.js";
 
 export function billLinks(baseUrl: string, token: string): Links {
@@ -37,7 +37,8 @@ export async function resolveSurvey(db: Db, brandId: string, key: string | null 
   if (!key) return null;
   const row = await db.query.surveys.findFirst({ where: and(eq(surveys.brandId, brandId), eq(surveys.key, key)) });
   if (row) return { survey: SurveySchema.parse(row.body), row };
-  if (key === "mission-happiness") return { survey: MISSION_HAPPINESS, row: null };
+  // "mission-happiness" is the programme's former name, still on older bills and triggers.
+  if (key === "project-wow" || key === "mission-happiness") return { survey: PROJECT_WOW, row: null };
   return null;
 }
 

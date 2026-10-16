@@ -156,7 +156,6 @@ export interface TriggerActions {
   /** Tried in order until one succeeds. */
   channels: ("whatsapp" | "sms" | "email")[];
   delaySeconds?: number;
-  otpLock?: boolean;
 }
 
 export const triggers = pgTable("triggers", {
@@ -195,7 +194,6 @@ export const bills = pgTable(
     triggerId: uuid("trigger_id"),
     templateVersionId: uuid("template_version_id"),
     surveyKey: text("survey_key"),
-    otpLock: boolean("otp_lock").notNull().default(false),
     /** SHA-256 of the canonical data at render time; printed in the verify page. */
     contentHash: text("content_hash"),
     openedAt: timestamp("opened_at", { withTimezone: true }),

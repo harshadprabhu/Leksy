@@ -17,14 +17,20 @@ export const SurveySchema = z.object({
   thankYou: z.string().max(300).default("Thank you! Your feedback goes straight to the store team."),
   /** The question whose 1–5 answer drives alerts and review prompts. */
   primary: z.string().default("overall"),
+  /**
+   * One tap: only the primary question is asked, at the top of the bill. The tap is
+   * the answer; it is saved at once and the question disappears for good.
+   */
+  oneTap: z.boolean().default(false),
   questions: z.array(QuestionSchema).min(1).max(30),
 });
 
 export type Survey = z.infer<typeof SurveySchema>;
 export type Question = z.infer<typeof QuestionSchema>;
 
-export const MISSION_HAPPINESS: Survey = SurveySchema.parse({
-  title: "Mission Happiness",
+export const PROJECT_WOW: Survey = SurveySchema.parse({
+  title: "Project WOW",
+  oneTap: true,
   questions: [
     { id: "overall", type: "rating", style: "faces", label: "How happy are you with your visit today?", required: true },
     { id: "improve", type: "multi", label: "What could we do better?", options: ["Store ambience", "Staff help", "Product range", "Waiting time", "Billing", "Pricing"], showIf: { question: "overall", op: "lte", value: 3 } },

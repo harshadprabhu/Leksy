@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canonicalJson, generateApiKey, hashPassword, parseApiKey, randomToken, sha256, signPayload, verifyPassword, verifySignature } from "./crypto.js";
-import { cleanAnswers, MISSION_HAPPINESS } from "./survey.js";
+import { cleanAnswers, PROJECT_WOW } from "./survey.js";
 
 describe("crypto", () => {
   it("makes url-safe tokens of the requested length", () => {
@@ -37,13 +37,13 @@ describe("crypto", () => {
 
 describe("survey", () => {
   it("keeps branching answers that are visible and drops hidden ones", () => {
-    const low = cleanAnswers(MISSION_HAPPINESS, { overall: 2, improve: ["Waiting time", "Hacked"], loved: ["Pricing"], nps: 4 });
+    const low = cleanAnswers(PROJECT_WOW, { overall: 2, improve: ["Waiting time", "Hacked"], loved: ["Pricing"], nps: 4 });
     expect(low.errors).toEqual([]);
     expect(low.answers).toEqual({ overall: 2, improve: ["Waiting time"], nps: 4 });
   });
 
   it("requires the primary rating and validates ranges", () => {
-    expect(cleanAnswers(MISSION_HAPPINESS, {}).errors).toContain("overall is required");
-    expect(cleanAnswers(MISSION_HAPPINESS, { overall: 9 }).errors[0]).toMatch(/1–5/);
+    expect(cleanAnswers(PROJECT_WOW, {}).errors).toContain("overall is required");
+    expect(cleanAnswers(PROJECT_WOW, { overall: 9 }).errors[0]).toMatch(/1–5/);
   });
 });

@@ -55,7 +55,6 @@ export async function processBill(d: WorkerDeps, job: ProcessJob) {
       triggerId: trigger?.id ?? null,
       templateVersionId: versionId,
       surveyKey: data.survey ?? actions.surveyKey ?? null,
-      otpLock: actions.otpLock ?? false,
       contentHash: contentHash(data),
       status: skip ? "skipped" : "queued",
       updatedAt: sql`now()`,

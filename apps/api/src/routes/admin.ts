@@ -31,7 +31,6 @@ const TriggerBody = z.object({
     surveyKey: z.string().max(64).optional(),
     channels: z.array(z.enum(["whatsapp", "sms", "email"])).min(1),
     delaySeconds: z.number().int().min(0).max(86_400).optional(),
-    otpLock: z.boolean().optional(),
   }),
   priority: z.number().int().min(0).max(10_000).default(100),
   enabled: z.boolean().default(true),

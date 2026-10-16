@@ -263,7 +263,7 @@ pre.code { background: var(--bg); border: 1px solid var(--line); border-radius: 
 .ins-stats b, .nw-card .kpi .v, .fc-card .kpi .v { font-family: var(--app-font); font-weight: 600; letter-spacing: -.01em; }
 .ins-stats b { font-size: 26px; }
 
-/* ---------- Bills and Mission Happiness, in the brand's look ---------- */
+/* ---------- Bills and Project WOW, in the brand's look ---------- */
 .hero-search input { border-radius: 999px; border: 1px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .08); color: #fff; padding: 6px 14px; min-width: 240px; }
 .hero-search input::placeholder { color: rgba(255, 255, 255, .55); }
 .hero-search .btn { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .3); border-radius: 999px; }

@@ -87,7 +87,7 @@ const NAV = [
   ["/", "Dashboard"],
   ["/insights", "Insights"],
   ["/bills", "Bills"],
-  ["/feedback", "Mission Happiness"],
+  ["/feedback", "Project WOW"],
   ["/surveys", "Survey editor"],
   ["/studio", "Template Studio"],
   ["/connectors", "Integrations"],

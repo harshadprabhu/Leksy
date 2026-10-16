@@ -21,6 +21,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 
 /** Server-rendered survey form; the script below adds stars, branching and submit. */
 export function surveyHtml(survey: Survey, title: string, alreadyAnswered: boolean): string {
+  if (survey.oneTap) return alreadyAnswered ? "" : oneTapHtml(survey, title);
   if (alreadyAnswered) return `<div class="lx-sv lx-done"><p>Thank you — we've received your feedback.</p></div>`;
   const qs = survey.questions
     .map((q) => {
@@ -41,6 +42,15 @@ export function surveyHtml(survey: Survey, title: string, alreadyAnswered: boole
     })
     .join("");
   return `<form class="lx-sv" id="lx-survey" novalidate><h3>${esc(title)}</h3>${qs}<button type="submit" class="lx-button lx-submit">Submit</button><p class="lx-err" hidden></p></form><div class="lx-sv lx-thanks" hidden><p>${esc(survey.thankYou)}</p><a class="lx-button lx-review" hidden target="_blank" rel="noopener">Share it on Google</a></div>`;
+}
+
+const SHINE = `<svg width="0" height="0" style="position:absolute"><defs><radialGradient id="lx-shine" cx=".35" cy=".3" r=".6"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs></svg>`;
+
+/** The one-tap rating: five faces; the tap is the answer and cannot be changed. */
+function oneTapHtml(survey: Survey, title: string): string {
+  const q = survey.questions.find((x) => x.id === survey.primary);
+  const faces = [1, 2, 3, 4, 5].map((n) => `<button type="button" role="radio" aria-checked="false" data-v="${n}" aria-label="${FACE_LABELS[n - 1]}" style="--fc:${FACE_COLORS[n - 1]}">${faceSvg(n)}<span class="lx-burst"></span></button>`).join("");
+  return `<div class="lx-sv lx-wow" id="lx-wow" data-q="${esc(survey.primary)}"><h3>${esc(title)}</h3>${q && q.label !== title ? `<p class="lx-wow-sub">${esc(q.label)}</p>` : ""}<div class="lx-faces" role="radiogroup" aria-label="${esc(q?.label ?? title)}">${SHINE}${faces}</div><div class="lx-face-label" aria-live="polite">Tap a face</div><p class="lx-wow-thanks" hidden>${esc(survey.thankYou)}</p><p class="lx-err" hidden></p></div>`;
 }
 
 export const SURVEY_CSS = `
@@ -77,10 +87,42 @@ export const SURVEY_CSS = `
 .lx-sv textarea{width:100%;border:1px solid rgba(0,0,0,.15);border-radius:10px;padding:10px;font:inherit}
 .lx-submit{border:0;cursor:pointer;width:100%;margin-top:8px}
 .lx-err{color:#b3261e;font-size:13px}
+.lx-wow{text-align:center;overflow:hidden;transition:max-height .5s ease,opacity .45s ease,margin .5s ease,padding .5s ease}
+.lx-wow h3{margin:0 0 2px}
+.lx-wow-sub{margin:0;font-size:13px;opacity:.75}
+.lx-wow.sent .lx-faces{pointer-events:none}
+.lx-wow-thanks{margin:8px 0 0;font-weight:600;font-size:14px;animation:lx-fade .4s ease both}
+.lx-wow.gone{max-height:0!important;opacity:0;margin-top:0!important;margin-bottom:0!important;padding-top:0;padding-bottom:0}
+@keyframes lx-fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 `;
 
 /** Vanilla JS, no framework: keeps the page fast on 4G. */
 export const SURVEY_JS = `
+// window.LX_SUBMIT lets a host page (the demo) take the answers instead of the API.
+function lxSubmit(a){return (window.LX_SUBMIT||function(a){return fetch(location.pathname.replace(/\\/$/,'')+'/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({answers:a})})
+ .then(function(r){return r.json().then(function(j){return {ok:r.ok,status:r.status,j:j};});});})(a);}
+(function(){
+// One tap: the chosen face is saved at once, locked, thanked, then the box folds away.
+var w=document.getElementById('lx-wow'); if(!w) return;
+var lb=w.querySelector('.lx-face-label'),err=w.querySelector('.lx-err');
+function vanish(){w.style.maxHeight=w.scrollHeight+'px';void w.offsetHeight;w.classList.add('gone');
+ setTimeout(function(){var b=w.closest('.lx-block')||w;b.parentNode&&b.parentNode.removeChild(b);},600);}
+w.querySelectorAll('.lx-faces button').forEach(function(b){b.addEventListener('click',function(){
+ if(w.classList.contains('sent'))return;w.classList.add('sent');err.hidden=true;
+ var fs=w.querySelector('.lx-faces');fs.classList.add('chosen');
+ fs.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-checked',x===b?'true':'false');x.disabled=true;});
+ void b.offsetWidth;b.classList.add('on');lb.textContent=b.getAttribute('aria-label');lb.style.setProperty('--lx-face',getComputedStyle(b).getPropertyValue('--fc'));
+ if(navigator.vibrate)try{navigator.vibrate(12);}catch(_){}
+ var a={};a[w.dataset.q]=Number(b.dataset.v);
+ lxSubmit(a).then(function(r){
+  // Saved, or already saved from an earlier visit: either way the question is done.
+  if(r.ok||r.status===409||/already/.test((r.j&&r.j.error)||'')){setTimeout(function(){lb.hidden=true;w.querySelector('.lx-wow-thanks').hidden=false;setTimeout(vanish,1800);},700);return;}
+  throw new Error((r.j&&r.j.error)||'Something went wrong');})
+ .catch(function(e){err.textContent=(e&&e.message&&e.message!=='Failed to fetch'?e.message:'Network error')+' — please tap again';err.hidden=false;
+  w.classList.remove('sent');fs.classList.remove('chosen');b.classList.remove('on');lb.textContent='Tap a face';
+  fs.querySelectorAll('button').forEach(function(x){x.disabled=false;x.setAttribute('aria-checked','false');});});
+});});
+})();
 (function(){
 var f=document.getElementById('lx-survey'); if(!f) return;
 var ans={};
@@ -102,19 +144,8 @@ f.querySelectorAll('.lx-q').forEach(function(q){var id=q.dataset.id,t=q.dataset.
  var ta=q.querySelector('textarea'); if(ta) ta.addEventListener('input',function(){ans[id]=ta.value;});});
 f.addEventListener('submit',function(e){e.preventDefault();var err=f.querySelector('.lx-err');err.hidden=true;
  var btn=f.querySelector('.lx-submit');btn.disabled=true;
- // window.LX_SUBMIT lets a host page (the demo) take the answers instead of the API.
- var submit=window.LX_SUBMIT||function(a){return fetch(location.pathname.replace(/\\/$/,'')+'/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({answers:a})})
-  .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});});};
- submit(ans).then(function(r){if(!r.ok){err.textContent=r.j.error||'Something went wrong';err.hidden=false;btn.disabled=false;return;}
+ lxSubmit(ans).then(function(r){if(!r.ok){err.textContent=r.j.error||'Something went wrong';err.hidden=false;btn.disabled=false;return;}
   f.hidden=true;var t=document.querySelector('.lx-thanks');t.hidden=false;
   if(r.j.reviewUrl){var a=t.querySelector('.lx-review');a.href=r.j.reviewUrl;a.hidden=false;}})
  .catch(function(){err.textContent='Network error, please try again';err.hidden=false;btn.disabled=false;});});
 })();`;
-
-export function otpPage(brandName: string, maskedPhone: string, nonce: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(brandName)} bill</title><style>body{font-family:system-ui,sans-serif;background:#fbf8f2;color:#2a2118;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}.c{max-width:360px;padding:28px;background:#fff;border-radius:16px;box-shadow:0 2px 24px rgba(0,0,0,.06);text-align:center}input{font-size:22px;letter-spacing:8px;text-align:center;width:180px;padding:10px;border:1px solid #ccc;border-radius:10px}button{margin-top:14px;padding:12px 22px;border:0;border-radius:999px;background:#b08d57;color:#fff;font-weight:600;cursor:pointer}p{color:#6b6b6b;font-size:14px}</style></head><body><div class="c"><h2>${esc(brandName)}</h2><p>This bill is protected. We'll send a code to ${esc(maskedPhone)}.</p><div id="s1"><button id="send">Send code</button></div><div id="s2" hidden><input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"><br><button id="verify">Open bill</button></div><p id="m"></p></div><script nonce="${nonce}">
-var base=location.pathname.replace(/\\/$/,'');function m(t){document.getElementById('m').textContent=t;}
-document.getElementById('send').onclick=function(){fetch(base+'/otp',{method:'POST'}).then(function(r){if(r.ok){document.getElementById('s1').hidden=true;document.getElementById('s2').hidden=false;m('Code sent.');}else m('Please wait a minute and try again.');});};
-document.getElementById('verify').onclick=function(){fetch(base+'/otp/verify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:document.getElementById('code').value})}).then(function(r){if(r.ok)location.reload();else m('That code did not match.');});};
-</script></body></html>`;
-}

@@ -1,13 +1,12 @@
 import type { Bill } from "@leksy/bill-schema";
-import { billLinks, contentHash, contextFor, emitWebhook, FeedbackError, randomToken, renderHtml, resolveSurvey, resolveTemplate, safeEqual, sendAlert, sha256, submitFeedback, templateByVersionId } from "@leksy/core";
+import { billLinks, contentHash, contextFor, emitWebhook, FeedbackError, randomToken, renderHtml, resolveSurvey, resolveTemplate, submitFeedback, templateByVersionId } from "@leksy/core";
 import { CAROUSEL_JS, SHARE_JS } from "@leksy/template-engine";
 import { bills, brands, events, feedback } from "@leksy/core/db";
 import { eq, sql } from "drizzle-orm";
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
-import { randomInt } from "node:crypto";
+import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";
 import type { Deps } from "../app.js";
-import { otpPage, SURVEY_CSS, SURVEY_JS, surveyHtml } from "@leksy/survey";
+import { SURVEY_CSS, SURVEY_JS, surveyHtml } from "@leksy/survey";
 
 const TOKEN = /^[0-9A-Za-z]{22}$/;
 
@@ -19,13 +18,6 @@ export const publicRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   const template = async (bill: typeof bills.$inferSelect) =>
     (bill.templateVersionId && (await templateByVersionId(d.db, bill.templateVersionId))) || (await resolveTemplate(d.db, bill.brandId, (bill.data as Bill).template ?? "luxe-gold")).template;
 
-  const unlocked = (req: FastifyRequest, bill: typeof bills.$inferSelect) => {
-    if (!bill.otpLock) return true;
-    const c = req.cookies[`lx_${bill.token}`];
-    const v = c ? req.unsignCookie(c) : null;
-    return !!v?.valid && v.value === "ok";
-  };
-
   const securityHeaders = (reply: FastifyReply, nonce: string) =>
     reply
       .header("content-security-policy", `default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'nonce-${nonce}'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`)
@@ -34,21 +26,17 @@ export const publicRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
       .header("x-robots-tag", "noindex, nofollow")
       .header("cache-control", "private, no-store");
 
-  /** The customer's bill page: branded bill + Mission Happiness survey. */
+  /** The customer's bill page: branded bill + Project WOW survey. */
   app.get<{ Params: { token: string } }>("/b/:token", { config: limit }, async (req, reply) => {
     const bill = await load(req.params.token);
     if (!bill) return reply.code(404).type("text/html").send("<h1>Bill not found</h1>");
     const nonce = randomToken(16);
     securityHeaders(reply, nonce);
     const brand = await d.db.query.brands.findFirst({ where: eq(brands.id, bill.brandId) });
-    if (!unlocked(req, bill)) {
-      const phone = bill.customerPhone ?? "";
-      return reply.type("text/html").send(otpPage(brand?.name ?? "", phone.length > 4 ? `••••••${phone.slice(-4)}` : "your phone", nonce));
-    }
     const data = bill.data as Bill;
     const links = billLinks(d.cfg.PUBLIC_BASE_URL, bill.token);
     const ctx = await contextFor(d.db, bill.brandId, data, links);
-    const s = await resolveSurvey(d.db, bill.brandId, bill.surveyKey ?? data.survey ?? "mission-happiness");
+    const s = await resolveSurvey(d.db, bill.brandId, bill.surveyKey ?? data.survey ?? "project-wow");
     const answered = s ? !!(await d.db.query.feedback.findFirst({ where: eq(feedback.billId, bill.id), columns: { id: true } })) : false;
     const html = await renderHtml(await template(bill), ctx, {
       title: `${brand?.name ?? "Your"} bill ${data.invoice_no}`,
@@ -67,8 +55,8 @@ export const publicRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
 
   app.post<{ Params: { token: string } }>("/b/:token/feedback", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req, reply) => {
     const bill = await load(req.params.token);
-    if (!bill || !unlocked(req, bill)) return reply.code(404).send({ error: "not_found" });
-    const s = await resolveSurvey(d.db, bill.brandId, bill.surveyKey ?? (bill.data as Bill).survey ?? "mission-happiness");
+    if (!bill) return reply.code(404).send({ error: "not_found" });
+    const s = await resolveSurvey(d.db, bill.brandId, bill.surveyKey ?? (bill.data as Bill).survey ?? "project-wow");
     if (!s) return reply.code(400).send({ error: "no_survey" });
     const body = z.object({ answers: z.record(z.string(), z.unknown()) }).parse(req.body);
     try {
@@ -89,35 +77,10 @@ export const publicRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
     }
   });
 
-  /** One-time code for high-value bills (sent to the phone on the bill). */
-  app.post<{ Params: { token: string } }>("/b/:token/otp", { config: { rateLimit: { max: 3, timeWindow: "1 minute" } } }, async (req, reply) => {
-    const bill = await load(req.params.token);
-    if (!bill?.otpLock || !bill.customerPhone) return reply.code(404).send({ error: "not_found" });
-    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-    await d.redis.set(`otp:${bill.token}`, sha256(code), "EX", 600);
-    await d.redis.del(`otp-tries:${bill.token}`);
-    const brand = await d.db.query.brands.findFirst({ where: eq(brands.id, bill.brandId) });
-    await sendAlert({ phone: bill.customerPhone }, `${code} is your code to open your ${brand?.name ?? ""} bill. Valid for 10 minutes.`, d.channels);
-    return { ok: true };
-  });
-
-  app.post<{ Params: { token: string } }>("/b/:token/otp/verify", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req, reply) => {
-    const bill = await load(req.params.token);
-    if (!bill?.otpLock) return reply.code(404).send({ error: "not_found" });
-    const { code } = z.object({ code: z.string().regex(/^\d{6}$/) }).parse(req.body);
-    const tries = await d.redis.incr(`otp-tries:${bill.token}`);
-    await d.redis.expire(`otp-tries:${bill.token}`, 600);
-    const stored = await d.redis.get(`otp:${bill.token}`);
-    if (tries > 5 || !stored || !safeEqual(stored, sha256(code))) return reply.code(400).send({ error: "invalid_code" });
-    await d.redis.del(`otp:${bill.token}`);
-    reply.setCookie(`lx_${bill.token}`, "ok", { signed: true, httpOnly: true, sameSite: "lax", secure: d.cfg.NODE_ENV === "production", path: `/b/${bill.token}`, maxAge: 30 * 86400 });
-    return { ok: true };
-  });
-
   /** PDF download, rendered from the same template as the page (without the survey). */
   app.get<{ Params: { token: string } }>("/b/:token/pdf", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (req, reply) => {
     const bill = await load(req.params.token);
-    if (!bill || !unlocked(req, bill)) return reply.code(404).send({ error: "not_found" });
+    if (!bill) return reply.code(404).send({ error: "not_found" });
     const data = bill.data as Bill;
     // A brand may keep a separate printable design (e.g. an A4 tax invoice) for downloads.
     const brand = await d.db.query.brands.findFirst({ where: (b, { eq: e }) => e(b.id, bill.brandId) });
@@ -142,7 +105,7 @@ export const publicRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
   /** Machine-readable copy of the bill. */
   app.get<{ Params: { token: string } }>("/b/:token/json", { config: limit }, async (req, reply) => {
     const bill = await load(req.params.token);
-    if (!bill || !unlocked(req, bill)) return reply.code(404).send({ error: "not_found" });
+    if (!bill) return reply.code(404).send({ error: "not_found" });
     return reply.header("content-disposition", `attachment; filename="${bill.invoiceNo.replace(/[^\w.-]/g, "_")}.json"`).send(bill.data);
   });
 

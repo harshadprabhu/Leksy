@@ -7,7 +7,7 @@
  */
 import { BillSchema, validateBill, type Bill } from "@leksy/bill-schema";
 import { applyMapping, samplePaths, suggestMapping, type Mapping } from "@leksy/mapper";
-import { cleanAnswers, MISSION_HAPPINESS, SurveySchema, type Survey } from "@leksy/survey";
+import { cleanAnswers, PROJECT_WOW, SurveySchema, type Survey } from "@leksy/survey";
 import { buildDemoDataset, regionOf, tierOf, staffFor, storeProfile, themesFor, THEMES, type Dataset, type SampleBill } from "@leksy/insights";
 import { deckFromKit, loadPack, parsePack, type BrandPack } from "./brandpack";
 import ORRA_PACK from "./orra-pack.json";
@@ -16,7 +16,7 @@ import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const KEY = "lx_demo_v7"; // v7: ORRA Fine Jewellery (its 94 stores), e-bill with ORRA's own campaign banners
+const KEY = "lx_demo_v8"; // v8: ORRA Fine Jewellery, Project WOW one-tap rating, no OTP
 const DAY = 864e5;
 
 interface DemoBill {
@@ -34,7 +34,6 @@ interface DemoBill {
   issues: unknown[];
   templateKey: string;
   templateVersion: number;
-  otpLock: boolean;
   surveyKey?: string | null;
 }
 
@@ -65,7 +64,7 @@ interface DemoState {
 }
 
 const defaultSurveys = (): DemoSurvey[] => [
-  { key: "mission-happiness", name: "Mission Happiness", body: MISSION_HAPPINESS, alertThreshold: 2, reviewThreshold: 4, slaMinutes: 240, updatedAt: new Date().toISOString() },
+  { key: "project-wow", name: "Project WOW", body: PROJECT_WOW, alertThreshold: 2, reviewThreshold: 4, slaMinutes: 240, updatedAt: new Date().toISOString() },
 ];
 
 // ---------- deterministic sample data ----------
@@ -223,8 +222,7 @@ function seed(): DemoState {
     stores: stores.map((s) => ({ id: id(), managerEmail: null, ...s })),
     templates: [...(pack.templates ?? []).map((t) => ver(t.key, t.name, t.body)), ...Object.entries(PRESETS).map(([key, body]) => ver(key, body.name, body))],
     triggers: [
-      { id: id(), name: "High-value jewellery: protect with OTP", event: "bill.created", conditions: [{ field: "total", op: "gt", value: 200000 }], actions: { templateKey: billKey, surveyKey: "mission-happiness", channels: ["whatsapp", "sms", "email"], otpLock: true }, priority: 10, enabled: true },
-      { id: id(), name: "Send every bill", event: "bill.created", conditions: [{ field: "customer.consent", op: "neq", value: false }], actions: { templateKey: billKey, surveyKey: "mission-happiness", channels: ["whatsapp", "sms", "email"] }, priority: 100, enabled: true },
+      { id: id(), name: "Send every bill", event: "bill.created", conditions: [{ field: "customer.consent", op: "neq", value: false }], actions: { templateKey: billKey, surveyKey: "project-wow", channels: ["whatsapp", "sms", "email"] }, priority: 100, enabled: true },
     ],
     connectors: [
       { id: "conn-push", name: "Ginesys POS (push)", kind: "push", ingestKey: "demoPushKey0000000000001", mapping: null, sample: PUSH_SAMPLE, pull: null, intervalSeconds: null, enabled: true, lastRunAt: null, lastError: null, cursor: null },
@@ -301,7 +299,6 @@ function addBill(state: DemoState, bill: Bill, source: string, at = new Date(), 
     issues: validateBill(bill),
     templateKey: tpl.key,
     templateVersion: tpl.publishedVersion ?? 1,
-    otpLock: !!actions.otpLock,
     surveyKey: bill.survey ?? actions.surveyKey ?? null,
   };
   state.bills.unshift(row);
@@ -451,7 +448,7 @@ export function markOpened(bill: DemoBill) {
 /** The survey a bill asks (the one its trigger chose), or null for none. */
 export function surveyFor(bill: DemoBill): DemoSurvey | null {
   const s = load();
-  const key = bill.surveyKey === undefined ? "mission-happiness" : bill.surveyKey;
+  const key = bill.surveyKey === undefined ? "project-wow" : bill.surveyKey;
   return key ? (s.surveys.find((x) => x.key === key) ?? null) : null;
 }
 

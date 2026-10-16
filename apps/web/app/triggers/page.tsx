@@ -15,7 +15,7 @@ interface Trigger {
   name: string;
   event: "bill.created" | "bill.updated";
   conditions: Cond[];
-  actions: { templateKey: string; surveyKey?: string; channels: Channel[]; delaySeconds?: number; otpLock?: boolean };
+  actions: { templateKey: string; surveyKey?: string; channels: Channel[]; delaySeconds?: number };
   priority: number;
   enabled: boolean;
 }
@@ -29,7 +29,7 @@ const OPS = [
   ["contains", "contains"],
   ["exists", "has a value"],
 ];
-const BLANK: Trigger = { name: "", event: "bill.created", conditions: [], actions: { templateKey: "luxe-gold", surveyKey: "mission-happiness", channels: ["whatsapp", "sms", "email"] }, priority: 100, enabled: true };
+const BLANK: Trigger = { name: "", event: "bill.created", conditions: [], actions: { templateKey: "luxe-gold", surveyKey: "project-wow", channels: ["whatsapp", "sms", "email"] }, priority: 100, enabled: true };
 
 /** Rules that decide which template, survey and channels a bill gets. First match wins. */
 export default function Triggers() {
@@ -92,7 +92,6 @@ export default function Triggers() {
                   </td>
                   <td className="small">
                     <span className="mono">{t.actions.templateKey}</span> via {t.actions.channels.join(" → ")}
-                    {t.actions.otpLock && <span className="badge warn">OTP</span>}
                     {t.actions.delaySeconds ? <span className="muted"> after {t.actions.delaySeconds}s</span> : null}
                   </td>
                   <td>
@@ -205,9 +204,6 @@ export default function Triggers() {
               <label className="f">
                 Delay (seconds)
                 <input type="number" min={0} value={edit.actions.delaySeconds ?? 0} onChange={(e) => setEdit({ ...edit, actions: { ...edit.actions, delaySeconds: Number(e.target.value) || undefined } })} style={{ width: 110 }} />
-              </label>
-              <label className="row small">
-                <input type="checkbox" checked={!!edit.actions.otpLock} onChange={(e) => setEdit({ ...edit, actions: { ...edit.actions, otpLock: e.target.checked || undefined } })} /> Ask for OTP before showing the bill
               </label>
             </div>
             {err && <div className="err">{err}</div>}

@@ -40,7 +40,7 @@ function uniqueId(label: string, taken: string[]) {
 
 const PREVIEW_JS = `<script>window.LX_SUBMIT=function(){return Promise.resolve({ok:true,j:{}});};</script>`;
 
-/** Mission Happiness survey builder: questions, branching, alerts and a live phone preview. */
+/** Project WOW survey builder: questions, branching, alerts and a live phone preview. */
 export default function Surveys() {
   const { data, reload } = useApi<{ surveys: Row[] }>("/v1/surveys");
   const [edit, setEdit] = useState<Row | null>(null);
@@ -163,6 +163,9 @@ export default function Surveys() {
             <label className="f">
               Thank-you message
               <input value={edit.body.thankYou} onChange={(e) => setBody({ thankYou: e.target.value })} />
+            </label>
+            <label className="row small">
+              <input type="checkbox" checked={!!edit.body.oneTap} onChange={(e) => setBody({ oneTap: e.target.checked })} /> One tap: ask only the happiness score at the top of the bill. The tap is saved at once and the question disappears; it cannot be changed.
             </label>
             <div className="small muted">
               Survey key <span className="mono">{edit.key}</span>. Pick it in a trigger to use it for those bills.

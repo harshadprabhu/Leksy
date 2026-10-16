@@ -1,7 +1,7 @@
 {
   "name": "leksy",
   "private": true,
-  "description": "Leksy (pronounced \"Lexi\") — luxury digital e-bills, Mission Happiness feedback and retail analytics.",
+  "description": "Leksy (pronounced \"Lexi\") — luxury digital e-bills, Project WOW feedback and retail analytics.",
   "packageManager": "pnpm@10.28.0",
   "engines": { "node": ">=22" },
   "scripts": {

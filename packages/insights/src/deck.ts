@@ -396,7 +396,7 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
     const s = pptx.addSlide({ masterName: "CONTENT" });
     const top = themesFor(ds).slice(0, 6);
     const totalMentions = themesFor(ds).reduce((a, x) => a + x.count, 0);
-    title(s, top[0] ? `${top[0].option}: ${Math.round((100 * top[0].count) / Math.max(1, totalMentions))}% of complaints` : "Customer happiness", "Mission Happiness · last 30 days");
+    title(s, top[0] ? `${top[0].option}: ${Math.round((100 * top[0].count) / Math.max(1, totalMentions))}% of complaints` : "Customer happiness", "Project WOW · last 30 days");
     if (top.length) {
       s.addChart("doughnut", [{ name: "Complaints", labels: top.map((x) => x.option), values: top.map((x) => x.count) }], {
         x: 0.5, y: 1.6, w: 6.0, h: 5.1, holeSize: 58, chartColors: CAT.slice(0, top.length), showPercent: true, showValue: false, showLegend: true, legendPos: "r",
@@ -503,7 +503,7 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
     s.background = { color: P };
     s.addText("How the numbers were made", { x: 0.7, y: 0.8, w: 11.5, h: 0.7, fontFace: HF, fontSize: 30, bold: true, color: "FFFFFF", margin: 0, isTextBox: true });
     const lines = [
-      `Source: ${theme.company}'s Leksy e-bills and Mission Happiness, aggregated by day and store`,
+      `Source: ${theme.company}'s Leksy e-bills and Project WOW, aggregated by day and store`,
       "Figures are calculated, not written by AI",
       `Forecast: best of 3 models on an 8-week backtest${india ? `, error ${india.mape.toFixed(1)}%` : ""}; 80% ranges`,
       "Regional and national festival dates are built in (lunar dates approximate)",

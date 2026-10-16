@@ -5,13 +5,13 @@
 - **E-bills:** a branded, mobile-first page per bill, with PDF download, certificates (hallmark/HUID, IGI/GIA), loyalty points and a QR that proves the bill is genuine.
 - **Plug-and-play integration in both directions:** the store system calls Leksy's API, *or* Leksy pulls from the store system's API. Either way, a no-code field mapper turns their JSON into a Leksy bill.
 - **Template Studio:** a no-code designer. Drag blocks, bind fields from real bills, add show/hide rules, preview, publish.
-- **Mission Happiness:** branching survey inside the bill, low-score alerts to the store manager with an SLA, Google-review prompt for happy customers.
+- **Project WOW:** one-tap happiness rating at the top of the bill (or a full branching survey), low-score alerts to the store manager with an SLA, Google-review prompt for happy customers.
 - **Analytics:** delivery, opens, ratings, NPS, store league table and improvement themes.
 - **Insights:** ask questions in plain English, forecast sales with festival-aware models, and download a PowerPoint pre-read in the company's look. Runs locally; an optional local language model (Ollama) or, only if an admin allows it, an external copilot can add more help. See [docs/insights.md](docs/insights.md).
 
 ## Live demo
 
-**https://harshadprabhu.github.io/Leksy/** — a browser-only proof of concept with sample data for a jewellery brand. Click **Simulate a sale**, open the bill as the customer, rate the visit, then watch the dashboard and the Mission Happiness inbox update. Change the bill's design in Template Studio, publish, and reload the bill. Nothing is sent and no server is involved; data lives in your browser (use **Reset demo** to start over).
+**https://harshadprabhu.github.io/Leksy/** — a browser-only proof of concept with sample data for a jewellery brand. Click **Simulate a sale**, open the bill as the customer, rate the visit, then watch the dashboard and the Project WOW inbox update. Change the bill's design in Template Studio, publish, and reload the bill. Nothing is sent and no server is involved; data lives in your browser (use **Reset demo** to start over).
 
 Build it yourself: `NEXT_PUBLIC_DEMO=1 NEXT_PUBLIC_BASE_PATH=/Leksy pnpm --filter @leksy/web build` → `apps/web/out`.
 
@@ -29,9 +29,9 @@ Customer ─────────► Bill page (+ survey, PDF, verify)       
 | `packages/template-engine` | Template JSON schema, `{{field \| formatter}}` binding, safe HTML renderer, presets |
 | `packages/mapper` | No-code field mapping (any JSON → canonical bill), suggestions |
 | `packages/core` | Database schema and migrations, services (ingest, triggers, render, pull, feedback, analytics, webhooks), channels, queues |
-| `apps/api` | REST API, public bill pages, PDF, OTP lock, provider webhooks |
+| `apps/api` | REST API, public bill pages, PDF, provider webhooks |
 | `apps/worker` | Queue processors: trigger matching, delivery with fallback, scheduled pulls, alerts, SLA checks, outbound webhooks |
-| `apps/web` | Dashboard, bills, Mission Happiness inbox, Template Studio, integrations and mapper, triggers, settings |
+| `apps/web` | Dashboard, bills, Project WOW inbox, Template Studio, integrations and mapper, triggers, settings |
 
 Everything is self-hosted on standard infrastructure: PostgreSQL, Redis, Node.js and Chromium, with no backend-as-a-service. Each service is stateless and scales on its own (see `infra/k8s`).
 
