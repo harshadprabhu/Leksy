@@ -1,5 +1,5 @@
 import { parseApiKey, sha256, safeEqual, verifySignature } from "@leksy/core";
-import { apiKeys, type Db } from "@leksy/core/db";
+import { apiKeys, users, type Db } from "@leksy/core/db";
 
 import { eq, sql } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -45,16 +45,32 @@ export function apiKeyAuth(db: Db) {
   };
 }
 
-/** Dashboard users: JWT issued by /v1/auth/login. */
+let usersDb: Db | null = null;
+/** Lets user checks read the team table (set once by buildApp). */
+export const setAuthDb = (db: Db) => {
+  usersDb = db;
+};
+
+/**
+ * Dashboard users: JWT issued by /v1/auth/login. The role and stores come from the
+ * team table on every request, so removing someone or changing their role takes
+ * effect at once rather than when their token expires.
+ */
 export function userAuth(roles?: Principal["role"][]) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
+    let u: { sub: string; brandId: string; role: Principal["role"]; storeCodes?: string[] | null };
     try {
-      const u = await req.jwtVerify<{ sub: string; brandId: string; role: Principal["role"]; storeCodes?: string[] | null }>();
-      if (roles && !roles.includes(u.role)) return reply.code(403).send({ error: "forbidden" });
-      req.principal = { brandId: u.brandId, kind: "user", userId: u.sub, role: u.role, storeCodes: u.storeCodes };
+      u = await req.jwtVerify<typeof u>();
     } catch {
       return reply.code(401).send({ error: "unauthorized" });
     }
+    if (usersDb) {
+      const row = await usersDb.query.users.findFirst({ where: eq(users.id, u.sub), columns: { brandId: true, role: true, storeCodes: true } });
+      if (!row || row.brandId !== u.brandId) return reply.code(401).send({ error: "unauthorized" });
+      u = { ...u, role: row.role, storeCodes: row.storeCodes };
+    }
+    if (roles && !roles.includes(u.role)) return reply.code(403).send({ error: "forbidden" });
+    req.principal = { brandId: u.brandId, kind: "user", userId: u.sub, role: u.role, storeCodes: u.storeCodes };
   };
 }
 

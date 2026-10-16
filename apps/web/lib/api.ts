@@ -25,11 +25,19 @@ export const auth = {
   set(token: string) {
     try {
       localStorage.setItem("lx_token", token);
+      localStorage.removeItem("lx_role");
     } catch {}
   },
   clear() {
     try {
       localStorage.removeItem("lx_token");
+      localStorage.removeItem("lx_role");
+    } catch {}
+  },
+  /** The role the server last reported (it can change after sign-in). */
+  rememberRole(role: string) {
+    try {
+      localStorage.setItem("lx_role", role);
     } catch {}
   },
   /** The signed-in user's role, read from the token (the API still checks every request). */
@@ -38,6 +46,8 @@ export const auth = {
     const t = this.token;
     if (!t) return null;
     try {
+      const known = localStorage.getItem("lx_role");
+      if (known) return known as "owner" | "admin" | "manager" | "viewer";
       const b64 = t.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/");
       return (JSON.parse(atob(b64)) as { role?: "owner" | "admin" | "manager" | "viewer" }).role ?? null;
     } catch {
@@ -54,7 +64,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
     try {
       return await demoApi<T>(path, init.method ?? (init.body !== undefined ? "POST" : "GET"), init.body);
     } catch (e) {
-      if (e instanceof DemoError) throw new ApiError(e.status, { error: e.message });
+      if (e instanceof DemoError) throw new ApiError(e.status, { error: e.message, message: e.message });
       throw e;
     }
   }

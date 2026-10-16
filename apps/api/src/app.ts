@@ -17,7 +17,9 @@ import { ingestRoutes } from "./routes/ingest.js";
 import { insightsRoutes } from "./routes/insights.js";
 import { providerRoutes } from "./routes/providers.js";
 import { publicRoutes } from "./routes/public.js";
+import { teamRoutes } from "./routes/team.js";
 import { templateRoutes } from "./routes/templates.js";
+import { setAuthDb } from "./auth.js";
 
 export interface Deps {
   cfg: Config;
@@ -74,7 +76,9 @@ export async function buildApp(deps: Deps): Promise<FastifyInstance> {
   app.get("/health", async () => ({ ok: true }));
   app.get("/favicon.ico", async (_req, reply) => reply.code(204).send());
 
+  setAuthDb(deps.db);
   await app.register(authRoutes(deps));
+  await app.register(teamRoutes(deps));
   await app.register(ingestRoutes(deps));
   await app.register(billRoutes(deps));
   await app.register(templateRoutes(deps));

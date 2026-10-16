@@ -94,6 +94,7 @@ const NAV = [
   ["/studio", "Template Studio", true],
   ["/connectors", "Integrations", true],
   ["/triggers", "Triggers", true],
+  ["/team", "Team", true],
   ["/settings", "Settings", true],
 ] as const;
 
@@ -123,6 +124,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
     if (!auth.token) router.replace("/login");
     else setReady(true);
   }, [router]);
+  // The role can change after sign-in (an admin edits the team): ask the server.
+  const [, setRoleTick] = useState(0);
+  useEffect(() => {
+    if (!ready || DEMO) return;
+    api<{ user?: { role: string } }>("/v1/me")
+      .then((r) => {
+        if (r.user?.role && r.user.role !== auth.role) {
+          auth.rememberRole(r.user.role);
+          setRoleTick((n) => n + 1);
+        }
+      })
+      .catch(() => {});
+  }, [ready]);
   const { kit, known } = useBrandKit(ready);
   useStackLabels(ready && known);
   if (opening) return <div className="empty">Opening the brand demo…</div>;

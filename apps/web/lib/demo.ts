@@ -61,6 +61,38 @@ interface DemoState {
   webhooks: any[];
   surveys: DemoSurvey[];
   seq: number;
+  team?: DemoMember[];
+  invites?: DemoInvite[];
+}
+
+interface DemoMember {
+  id: string;
+  email: string;
+  name: string | null;
+  role: "owner" | "admin" | "manager" | "viewer";
+  storeCodes: string[] | null;
+  createdAt: string;
+}
+interface DemoInvite {
+  id: string;
+  token: string;
+  email: string;
+  name: string | null;
+  role: "admin" | "manager" | "viewer";
+  storeCodes: string[] | null;
+  expiresAt: string;
+  createdAt: string;
+}
+
+/** A believable starting team for the demo: the owner, a regional manager and a viewer. */
+function demoTeam(s: DemoState): DemoMember[] {
+  const west = s.stores.filter((x) => x.region === "West").slice(0, 3).map((x) => x.code);
+  const at = new Date(Date.now() - 20 * DAY).toISOString();
+  return [
+    { id: "u-demo", email: "demo@leksy.in", name: "Demo Owner", role: "owner", storeCodes: null, createdAt: at },
+    { id: "u-ananya", email: "ananya.rao@example.in", name: "Ananya Rao", role: "manager", storeCodes: west.length ? west : [s.stores[0]!.code], createdAt: at },
+    { id: "u-rahul", email: "rahul.mehta@example.in", name: "Rahul Mehta", role: "viewer", storeCodes: null, createdAt: at },
+  ];
 }
 
 const defaultSurveys = (): DemoSurvey[] => [
@@ -626,6 +658,65 @@ export async function demoApi<T>(path: string, method: string, body: any): Promi
   return structuredClone(out) as T;
 }
 
+function teamRoute(s: DemoState, M: string, res: string, rid: string | undefined, sub: string | undefined, body: any): any {
+  s.team ??= demoTeam(s);
+  s.invites ??= [];
+  const now = Date.now();
+  s.invites = s.invites.filter((i) => Date.parse(i.expiresAt) > now);
+  const codes = new Set(s.stores.map((x) => x.code));
+  const cleanStores = (role: string, list: unknown): string[] | null => {
+    const l = Array.isArray(list) ? [...new Set(list.map(String))] : [];
+    if (role === "manager" && !l.length) throw new DemoError(400, "Choose at least one store for a manager.");
+    const unknown = l.filter((c) => !codes.has(c));
+    if (unknown.length) throw new DemoError(400, `No store with code ${unknown.join(", ")}`);
+    return role === "admin" || !l.length ? null : l;
+  };
+  if (res === "invites") {
+    const inv = s.invites.find((i) => i.token === rid);
+    if (!inv) throw new DemoError(404, "This invitation has expired or was already used.");
+    if (M === "GET") return { brand: s.brand.name, logoUrl: s.brand.logoUrl ?? null, email: inv.email, name: inv.name, role: inv.role, storeCodes: inv.storeCodes };
+    if (s.team.some((m) => m.email === inv.email)) throw new DemoError(409, "This email already has a Leksy account.");
+    const m: DemoMember = { id: id(), email: inv.email, name: String(body?.name ?? inv.name ?? ""), role: inv.role, storeCodes: inv.storeCodes, createdAt: new Date().toISOString() };
+    s.team.push(m);
+    s.invites = s.invites.filter((i) => i !== inv);
+    return { token: "demo", user: m };
+  }
+  if (!rid && M === "GET") return { members: s.team.map((m) => ({ ...m, you: m.id === "u-demo" })), invites: s.invites.map(({ token: _t, ...i }) => i) };
+  if (rid === "invites") {
+    if (M === "DELETE") {
+      s.invites = s.invites.filter((i) => i.id !== sub);
+      return null;
+    }
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new DemoError(400, "Enter a valid email address.");
+    if (!["admin", "manager", "viewer"].includes(body?.role)) throw new DemoError(400, "Choose a role.");
+    if (s.team.some((m) => m.email === email)) throw new DemoError(409, "This email already has a Leksy account.");
+    const storeCodes = cleanStores(body.role, body.storeCodes);
+    s.invites = s.invites.filter((i) => i.email !== email);
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[b % 62]).join("");
+    const inv: DemoInvite = { id: id(), token, email, name: body.name || null, role: body.role, storeCodes, expiresAt: new Date(now + 7 * DAY).toISOString(), createdAt: new Date().toISOString() };
+    s.invites.unshift(inv);
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const { token: _t, ...invite } = inv;
+    return { invite, link: `${origin}${BASE_PATH}/accept-invite/?token=${token}` };
+  }
+  if (rid === "members") {
+    const m = s.team.find((x) => x.id === sub);
+    if (!m) throw new DemoError(404, "not_found");
+    if (m.role === "owner") throw new DemoError(403, "The owner cannot be changed or removed.");
+    if (M === "DELETE") {
+      s.team = s.team.filter((x) => x !== m);
+      return null;
+    }
+    const role = body?.role ?? m.role;
+    m.storeCodes = cleanStores(role, body?.storeCodes === undefined ? m.storeCodes : body.storeCodes);
+    m.role = role;
+    if (body?.name !== undefined) m.name = body.name || null;
+    return m;
+  }
+  throw new DemoError(404, "not_found");
+}
+
 function route(s: DemoState, method: string, seg: string[], q: URLSearchParams, body: any): any {
   const [, res, rid, sub] = seg;
   const M = method;
@@ -633,6 +724,9 @@ function route(s: DemoState, method: string, seg: string[], q: URLSearchParams, 
   if (res === "auth") return { token: "demo", user: { id: "u-demo", email: "demo@leksy.in", name: "Demo Owner", role: "owner" } };
   if (res === "me") return { user: { id: "u-demo", email: "demo@leksy.in", name: "Demo Owner", role: "owner" }, brand: s.brand };
   if (res === "brand" && M === "PUT") return Object.assign(s.brand, body);
+
+  // Team and invitations (the demo's user is always the owner).
+  if (res === "team" || res === "invites") return teamRoute(s, M, res, rid, sub, body);
 
   if (res === "analytics") {
     const toDay = q.get("to") ?? istDate(new Date().toISOString());

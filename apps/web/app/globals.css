@@ -60,6 +60,8 @@ h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; text-transform: upperca
 @media (max-width: 900px) { .two { grid-template-columns: 1fr; } .shell { grid-template-columns: 1fr; } .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; } }
 
 table.t { width: 100%; border-collapse: collapse; }
+/* "stack" on a table means "cards on phones"; on wider screens it stays a real table. */
+table.t.stack { display: table; gap: 0; }
 .t th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 8px; border-bottom: 1px solid var(--line); }
 .t td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .t tr:last-child td { border-bottom: 0; }
@@ -422,3 +424,21 @@ pre.code { max-width: 100%; overflow: auto; }
 .powered-by { display: inline-flex; align-items: center; gap: 5px; text-transform: none; letter-spacing: .02em; font-size: 10px; }
 .powered-by .leksy-logo { height: 14px; }
 .verify-by { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+
+/* ---------- Team ---------- */
+.team-grid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 900px) { .team-grid { grid-template-columns: minmax(0, 1fr); } }
+.store-pick { display: flex; flex-direction: column; gap: 6px; }
+.store-pick-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px; background: var(--panel); }
+.store-pick-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.store-pick-row:hover { background: var(--bg); }
+.badge.role-owner { background: #2b2b33; color: #fff; border-color: #2b2b33; }
+.badge.role-admin { background: #ede7f6; color: #4527a0; border-color: #d1c4e9; }
+.badge.role-manager { background: #e3f2fd; color: #0d47a1; border-color: #bbdefb; }
+.badge.role-viewer { background: #f1f8e9; color: #33691e; border-color: #dcedc8; }
+.invite-ready { border-color: var(--accent); }
+.team-grid table.t { width: 100%; }
+.team-grid .badge { white-space: nowrap; }
+.team-field { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.team-field .store-pick { align-self: stretch; }
+.team-label { font-size: 13px; color: var(--muted); }

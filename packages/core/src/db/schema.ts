@@ -34,6 +34,28 @@ export const users = pgTable(
   (t) => [uniqueIndex("users_email_uq").on(t.email)],
 );
 
+/**
+ * An invitation to join a brand's team. Only a SHA-256 hash of the link's token is
+ * stored; the link works once and expires after 7 days.
+ */
+export const invites = pgTable(
+  "invites",
+  {
+    id: id(),
+    brandId: brandRef(),
+    email: text("email").notNull(),
+    name: text("name"),
+    role: text("role", { enum: ["admin", "manager", "viewer"] }).notNull(),
+    storeCodes: jsonb("store_codes").$type<string[]>(),
+    tokenHash: text("token_hash").notNull(),
+    invitedBy: uuid("invited_by"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("invites_token_uq").on(t.tokenHash), index("invites_brand_idx").on(t.brandId)],
+);
+
 export const stores = pgTable(
   "stores",
   {
