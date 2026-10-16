@@ -127,7 +127,7 @@ function renderBlock(block: Block, ctx: Ctx, opts: RenderOptions): string {
     }
     case "divider":
       if (block.props.style === "ornament")
-        return wrap(block, `<div class="lx-ornament" aria-hidden="true"><i></i><svg viewBox="0 0 40 40" width="34" height="34"><g fill="none" stroke="currentColor" stroke-width="1.4"><path d="M20 4c3 6 3 10 0 16-3-6-3-10 0-16zM20 36c-3-6-3-10 0-16 3 6 3 10 0 16zM4 20c6-3 10-3 16 0-6 3-10 3-16 0zM36 20c-6 3-10 3-16 0 6-3 10-3 16 0z"/><circle cx="20" cy="20" r="2.2" fill="currentColor"/></g></svg><i></i></div>`, opts);
+        return wrap(block, `<div class="lx-ornament" aria-hidden="true"><i></i><svg viewBox="0 0 40 32" width="30" height="24"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M12 5h16l8 8-16 16L4 13z"/><path d="M4 13h32M12 5l4 8 4-8 4 8 4-8M16 13l4 16 4-16"/></g></svg><i></i></div>`, opts);
       return wrap(block, `<hr style="border:0;border-top:${block.props.thickness}px ${block.props.style} currentColor;opacity:.35">`, opts);
     case "spacer":
       return wrap(block, `<div style="height:${block.props.height}px"></div>`, opts);

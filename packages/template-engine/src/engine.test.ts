@@ -149,3 +149,11 @@ describe("rich landing blocks", () => {
     expect(none).not.toContain("View certificates");
   });
 });
+
+describe("ornament divider", () => {
+  it("draws a cut diamond between the lines", () => {
+    const html = renderTemplate(TemplateSchema.parse({ blocks: [{ id: "d", type: "divider", props: { style: "ornament" } }] }), ctx);
+    expect(html).toContain('class="lx-ornament"');
+    expect(html).toContain('d="M12 5h16l8 8-16 16L4 13z"');
+  });
+});
