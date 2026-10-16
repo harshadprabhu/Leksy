@@ -214,9 +214,11 @@ function renderBlock(block: Block, ctx: Ctx, opts: RenderOptions): string {
       return wrap(block, `<a class="lx-button" href="${esc(href)}" target="_blank" rel="noopener">${text(block.props.label, ctx)}</a>`, opts);
     }
     case "download_buttons": {
-      const labels = { pdf: "Download PDF", image: "Save as image", json: "Download data" } as const;
+      const labels = { pdf: "Download PDF", share: "Share", image: "Save as image", json: "Download data" } as const;
       const links = block.props.formats
         .map((f) => {
+          // Share sends the PDF through the phone's share sheet (WhatsApp, Mail…).
+          if (f === "share") return `<a class="lx-button lx-share" href="${esc(safeUrl(stringOrEmpty(getPath(ctx, "links.pdf"))) ?? "#")}" data-lx-share>${labels.share}</a>`;
           const href = safeUrl(stringOrEmpty(getPath(ctx, `links.${f}`))) ?? "#";
           return `<a class="lx-button" href="${esc(href)}" download>${labels[f]}</a>`;
         })
@@ -261,7 +263,7 @@ export function templateCss(t: Template): string {
 .lx-page{box-sizing:border-box;max-width:${width};margin:0 auto;padding:${p.padding}px;background:${safeColor(p.background) ?? "#fff"}${bgImg ? ` url('${bgImg}') center/cover` : ""};color:${safeColor(p.textColor) ?? "#1a1a1a"};font-family:'${font}',system-ui,sans-serif;font-size:14px;line-height:1.5}
 .lx-page *{box-sizing:border-box}
 .lx-page{position:relative;--lx-accent:${accent}}
-.lx-wm{position:absolute;inset:0;pointer-events:none;background-repeat:no-repeat space;background-position:center 60px;z-index:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.lx-wm{position:absolute;inset:0;pointer-events:none;background-repeat:no-repeat;background-position:center 38%;z-index:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .lx-page>.lx-block{position:relative;z-index:1}
 .lx-page h1,.lx-page h2,.lx-page h3{font-family:'${heading}',serif;margin:0;font-weight:500;line-height:1.2}
 .lx-page h1{font-size:28px}.lx-page h2{font-size:22px}.lx-page h3{font-size:17px}
@@ -289,7 +291,8 @@ export function templateCss(t: Template): string {
 .lx-qr{display:flex;flex-direction:column;align-items:center;gap:6px}
 .lx-qr svg{display:block}
 .lx-buttons{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-.lx-button{display:inline-block;padding:10px 18px;border-radius:999px;background:${accent};color:#fff;text-decoration:none;font-weight:600;font-size:13px}
+.lx-button{display:inline-block;padding:12px 20px;border-radius:999px;background:${accent};color:#fff;text-decoration:none;font-weight:600;font-size:14px;min-height:44px;line-height:20px}
+.lx-button.lx-share{background:transparent;color:${accent};box-shadow:inset 0 0 0 1.5px ${accent}}
 .lx-cols{display:flex}
 .lx-col{flex:1;min-width:0}
 .lx-placeholder{border:1px dashed ${muted};color:${muted};padding:12px;text-align:center;border-radius:8px;font-size:12px;display:flex;align-items:center;justify-content:center}
@@ -316,3 +319,16 @@ export function renderDocument(t: Template, ctx: Ctx, opts: RenderOptions & { ti
     : "";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(opts.title ?? t.name)}</title>${fontLink}<style>body{margin:0;background:${safeColor(t.page.background) ?? "#fff"}}${templateCss(t)}</style>${opts.head ?? ""}</head><body>${renderTemplate(t, ctx, opts)}${opts.bodyEnd ?? ""}</body></html>`;
 }
+
+/**
+ * Share button for the bill page: sends the PDF itself through the phone's share
+ * sheet where the browser supports sharing files, otherwise shares the bill link,
+ * and as a last resort downloads the PDF.
+ */
+export const SHARE_JS = `document.addEventListener('click',function(e){var a=e.target.closest('[data-lx-share]');if(!a)return;e.preventDefault();
+var title=document.title;
+fetch(a.href).then(function(r){return r.blob();}).then(function(b){var f=new File([b],(title.split(' ').pop()||'bill')+'.pdf',{type:'application/pdf'});
+ if(navigator.canShare&&navigator.canShare({files:[f]}))return navigator.share({files:[f],title:title});
+ if(navigator.share)return navigator.share({title:title,url:location.href});
+ var u=URL.createObjectURL(b),d=document.createElement('a');d.href=u;d.download=f.name;d.click();setTimeout(function(){URL.revokeObjectURL(u)},4000);})
+.catch(function(){});});`;

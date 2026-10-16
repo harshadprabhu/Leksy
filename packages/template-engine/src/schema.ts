@@ -68,7 +68,7 @@ const leaf = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("certificates"), props: z.object({ title: z.string().max(120).default("Certificates") }) }),
   z.object({ ...base, type: z.literal("qr"), props: z.object({ value: z.string().max(2000).default("{{links.verify}}"), size: z.number().min(48).max(400).default(120), caption: z.string().max(200).optional() }) }),
   z.object({ ...base, type: z.literal("button"), props: z.object({ label: z.string().max(80), href: z.string().max(2000) }) }),
-  z.object({ ...base, type: z.literal("download_buttons"), props: z.object({ formats: z.array(z.enum(["pdf", "image", "json"])).default(["pdf"]) }) }),
+  z.object({ ...base, type: z.literal("download_buttons"), props: z.object({ formats: z.array(z.enum(["pdf", "share", "image", "json"])).default(["pdf", "share"]) }) }),
   z.object({ ...base, type: z.literal("survey"), props: z.object({ title: z.string().max(200).default("How was your visit?") }) }),
   z.object({ ...base, type: z.literal("social_links"), props: z.object({ links: z.array(z.object({ label: z.string().max(40), href: z.string().max(500) })).max(10) }) }),
 ]);

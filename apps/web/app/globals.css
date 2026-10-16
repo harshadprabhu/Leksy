@@ -383,3 +383,14 @@ pre.code { max-width: 100%; overflow: auto; }
   table.t.stack td { justify-content: flex-end; }
   table.t.stack td::before { margin-right: auto; }
 }
+
+/* ---------- Customer e-bill (phone first) ---------- */
+.ebill { min-height: 100vh; background: var(--eb-bg); padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+.ebill iframe { display: block; width: 100%; max-width: 520px; margin: 0 auto; border: 0; background: var(--eb-bg); }
+.ebill-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; gap: 10px; justify-content: center; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--eb-bg) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid rgba(0, 0, 0, .08); }
+.ebill-bar button { flex: 1; max-width: 240px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform .1s; }
+.ebill-bar button:active { transform: scale(.97); }
+.ebill-bar button:disabled { opacity: .7; }
+.ebill-bar .eb-primary { background: var(--eb-accent); color: #fff; border: 0; }
+.ebill-bar .eb-secondary { background: transparent; color: var(--eb-accent); border: 1.5px solid var(--eb-accent); }
+.ebill-note { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); background: #222; color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 999px; white-space: nowrap; box-shadow: 0 6px 20px rgba(0, 0, 0, .2); }

@@ -1,34 +1,56 @@
 "use client";
 import type { Bill } from "@leksy/bill-schema";
 import { SURVEY_CSS, SURVEY_JS, surveyHtml } from "@leksy/survey";
-import { renderDocument } from "@leksy/template-engine";
+import { renderDocument, type Template } from "@leksy/template-engine";
 import QRCode from "qrcode";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { DEMO } from "@/lib/api";
 import { billContext, billTemplate, findBillByToken, hasFeedback, liveTemplate, load, markOpened, submitDemoFeedback, surveyFor } from "@/lib/demo";
+import { htmlToPdf, saveBlob, sharePdf } from "@/lib/pdf";
 
 /**
- * What the customer sees after tapping the WhatsApp link (demo build).
- * The production page is served by the API at /b/:token with the same template and survey.
+ * What the customer sees after tapping the WhatsApp link (demo build): the bill as
+ * a phone page, a sticky bar to download the PDF or share it, and the happiness
+ * survey. The production page is served by the API at /b/:token with the same
+ * template, survey and share button.
  */
 const BRIDGE = `<script>
 window.LX_SUBMIT=function(a){return new Promise(function(res){
   function on(e){if(e.data&&e.data.lxFeedbackResult){removeEventListener('message',on);res(e.data.lxFeedbackResult);}}
   addEventListener('message',on);parent.postMessage({lxFeedback:a},'*');});};
 document.addEventListener('click',function(e){var a=e.target.closest('a');if(!a)return;
-  if(a.href.indexOf('print=1')>=0||a.href.indexOf('/verify/')>=0){e.preventDefault();parent.postMessage({lxOpen:a.href},'*');}},true);
+  if(a.href.indexOf('print=1')>=0){e.preventDefault();parent.postMessage({lxDownload:1},'*');}
+  else if(a.href.indexOf('/verify/')>=0){e.preventDefault();parent.postMessage({lxOpen:a.href},'*');}},true);
+// The page grows with its content, so the phone scrolls it like any web page.
+function h(){parent.postMessage({lxHeight:document.documentElement.scrollHeight},'*');}
+addEventListener('load',h);new ResizeObserver(h).observe(document.documentElement);
 </script>`;
+
+async function withQr(render: (qr: (value: string, size: number) => string) => string) {
+  const qr: { value: string; size: number }[] = [];
+  const doc = render((value, size) => {
+    qr.push({ value, size });
+    return `<!--lx-qr-${qr.length - 1}-->`;
+  });
+  const svgs = await Promise.all(qr.map((q) => QRCode.toString(q.value, { type: "svg", margin: 0, width: q.size })));
+  return doc.replace(/<!--lx-qr-(\d+)-->/g, (_, i: string) => svgs[Number(i)] ?? "");
+}
 
 function BillView() {
   const params = useSearchParams();
   const t = params.get("t") ?? "";
-  const printing = params.get("print") === "1";
+  const wantsPdf = params.get("print") === "1"; // old PDF links: open the bill and download at once
   const [html, setHtml] = useState<string | null>(null);
+  const [height, setHeight] = useState(900);
+  const [look, setLook] = useState<{ bg: string; accent: string; font: string }>({ bg: "#fff", accent: "#2a2118", font: "inherit" });
   const [locked, setLocked] = useState(false);
   const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"download" | "share" | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const frame = useRef<HTMLIFrameElement>(null);
+  const pdf = useRef<{ name: string; title: string; blob: Promise<Blob> } | null>(null);
 
   useEffect(() => {
     if (!DEMO) return;
@@ -39,7 +61,7 @@ function BillView() {
     }
     let unlocked = true;
     try {
-      unlocked = !bill.otpLock || printing || sessionStorage.getItem(`lx_otp_${t}`) === "ok";
+      unlocked = !bill.otpLock || sessionStorage.getItem(`lx_otp_${t}`) === "ok";
     } catch {}
     if (!unlocked) {
       setLocked(true);
@@ -47,32 +69,62 @@ function BillView() {
     }
     void (async () => {
       const s = load();
-      // Downloads use the brand's printable design when it has one (e.g. an A4 tax invoice).
-      const pdfKey = printing ? (s.brand.settings?.pdfTemplate as string | undefined) : undefined;
-      const tpl = (pdfKey && liveTemplate(s, pdfKey)) || billTemplate(s, bill);
+      const invoice = (bill.data as Bill).invoice_no;
+      const title = `${s.brand.name} bill ${invoice}`;
+      const tpl = billTemplate(s, bill);
       const ctx = billContext(s, bill);
       const answered = hasFeedback(bill);
       const sv = surveyFor(bill);
-      const qr: { value: string; size: number }[] = [];
-      const blocks = printing ? tpl.blocks.filter((b) => b.type !== "survey" && b.type !== "download_buttons") : tpl.blocks;
-      let doc = renderDocument({ ...tpl, blocks }, ctx, {
-        title: `${s.brand.name} bill ${(bill.data as Bill).invoice_no}`,
-        head: `<style>${SURVEY_CSS}</style>${BRIDGE}`,
-        surveySlot: (title) => (sv ? surveyHtml(sv.body, title, answered) : ""),
-        bodyEnd: printing ? `<script>addEventListener('load',function(){setTimeout(function(){print()},700)})</script>` : answered || !sv ? "" : `<script>${SURVEY_JS}</script>`,
-        qr: (value, size) => {
-          qr.push({ value, size });
-          return `<!--lx-qr-${qr.length - 1}-->`;
-        },
-      });
-      const svgs = await Promise.all(qr.map((q) => QRCode.toString(q.value, { type: "svg", margin: 0, width: q.size })));
-      doc = doc.replace(/<!--lx-qr-(\d+)-->/g, (_, i: string) => svgs[Number(i)] ?? "");
-      setHtml(doc);
-      if (!printing) markOpened(bill);
+      setLook({ bg: tpl.page.background, accent: tpl.page.accentColor, font: tpl.page.fontFamily });
+      // The phone page: the sticky bar below replaces the in-page download buttons.
+      const page = await withQr((qr) =>
+        renderDocument({ ...tpl, blocks: tpl.blocks.filter((b) => b.type !== "download_buttons") }, ctx, {
+          title,
+          head: `<style>${SURVEY_CSS}html,body{overflow:hidden}</style>${BRIDGE}`,
+          surveySlot: (st) => (sv ? surveyHtml(sv.body, st, answered) : ""),
+          bodyEnd: answered || !sv ? "" : `<script>${SURVEY_JS}</script>`,
+          qr,
+        }),
+      );
+      setHtml(page);
+      markOpened(bill);
+      // The PDF uses the brand's printable design (e.g. an A4 tax invoice); it is
+      // prepared in the background so Download and Share respond at once.
+      const pdfKey = s.brand.settings?.pdfTemplate as string | undefined;
+      const printTpl: Template = (pdfKey && liveTemplate(s, pdfKey)) || tpl;
+      const printable = await withQr((qr) => renderDocument({ ...printTpl, blocks: printTpl.blocks.filter((b) => b.type !== "survey" && b.type !== "download_buttons") }, ctx, { title, qr }));
+      pdf.current = { name: `${invoice}.pdf`, title, blob: new Promise((r) => setTimeout(r, 600)).then(() => htmlToPdf(printable)) };
+      if (wantsPdf) void download();
     })();
-  }, [t, printing, locked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, locked]);
 
-  // Survey answers and link clicks come up from the sandboxed bill.
+  const download = async () => {
+    if (!pdf.current) return;
+    setBusy("download");
+    try {
+      saveBlob(await pdf.current.blob, pdf.current.name);
+      setNote("Saved to your downloads");
+    } catch {
+      setNote("Could not create the PDF. Please try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const share = async () => {
+    if (!pdf.current) return;
+    setBusy("share");
+    try {
+      const r = await sharePdf(await pdf.current.blob, pdf.current.name, pdf.current.title);
+      setNote(r === "downloaded" ? "Sharing isn't available here, so the PDF was saved to your downloads" : null);
+    } catch {
+      setNote("Could not share the PDF. Please try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Survey answers, size changes and link taps come up from the sandboxed bill.
   useEffect(() => {
     const on = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow) return;
@@ -81,11 +133,27 @@ function BillView() {
         const result = bill ? submitDemoFeedback(bill, e.data.lxFeedback) : { ok: false, j: { error: "not found" } };
         frame.current?.contentWindow?.postMessage({ lxFeedbackResult: result }, "*");
       }
+      if (typeof e.data?.lxHeight === "number") setHeight(Math.ceil(e.data.lxHeight));
+      if (e.data?.lxDownload) void download();
       if (typeof e.data?.lxOpen === "string") window.open(e.data.lxOpen, "_blank", "noopener");
     };
     window.addEventListener("message", on);
     return () => window.removeEventListener("message", on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t]);
+
+  useEffect(() => {
+    document.body.style.background = look.bg;
+    return () => {
+      document.body.style.background = "";
+    };
+  }, [look.bg]);
+
+  useEffect(() => {
+    if (!note) return;
+    const id = setTimeout(() => setNote(null), 3500);
+    return () => clearTimeout(id);
+  }, [note]);
 
   if (!DEMO) return <div className="empty">Bills are served by the Leksy API at /b/&lt;token&gt;.</div>;
   if (err) return <div className="empty">{err}</div>;
@@ -113,7 +181,26 @@ function BillView() {
       </div>
     );
   if (!html) return <div className="empty">Loading your bill…</div>;
-  return <iframe ref={frame} title="Your bill" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-popups-to-escape-sandbox" srcDoc={html} style={{ border: 0, width: "100%", height: "100vh", display: "block" }} />;
+  return (
+    <div className="ebill" style={{ "--eb-accent": look.accent, "--eb-bg": look.bg, fontFamily: `'${look.font}', var(--app-font)` } as React.CSSProperties}>
+      <iframe ref={frame} title="Your bill" scrolling="no" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-popups-to-escape-sandbox" srcDoc={html} style={{ height }} />
+      <div className="ebill-bar" role="toolbar" aria-label="Bill actions">
+        {note && <div className="ebill-note">{note}</div>}
+        <button className="eb-primary" onClick={() => void download()} disabled={busy !== null}>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M12 3v12m0 0l-5-5m5 5l5-5M5 21h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {busy === "download" ? "Preparing…" : "Download PDF"}
+        </button>
+        <button className="eb-secondary" onClick={() => void share()} disabled={busy !== null}>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M12 15V3m0 0L7 8m5-5l5 5M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {busy === "share" ? "Preparing…" : "Share"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function BillPage() {

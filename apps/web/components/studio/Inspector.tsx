@@ -216,14 +216,14 @@ function PropsEditor({ block, setProps }: { block: Block; setProps: (p: Record<s
     case "download_buttons":
       return (
         <div className="stack">
-          {(["pdf", "json"] as const).map((f) => (
+          {(["pdf", "share", "json"] as const).map((f) => (
             <label key={f} className="row small">
               <input
                 type="checkbox"
                 checked={block.props.formats.includes(f)}
                 onChange={(e) => setProps({ formats: e.target.checked ? [...block.props.formats, f] : block.props.formats.filter((x) => x !== f) })}
               />
-              {f === "pdf" ? "PDF" : "Data (JSON)"}
+              {f === "pdf" ? "Download PDF" : f === "share" ? "Share (WhatsApp, Mail…)" : "Data (JSON)"}
             </label>
           ))}
         </div>

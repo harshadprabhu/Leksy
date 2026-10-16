@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildContext, evaluate, getAll, interpolate, listFields, PRESETS, renderDocument, renderTemplate, SAMPLE_BILL, SAMPLE_BRAND, SAMPLE_STORE, TemplateSchema, checkCondition } from "./index.js";
+import { buildContext, evaluate, getAll, interpolate, listFields, PRESETS, renderDocument, renderTemplate, templateCss, SAMPLE_BILL, SAMPLE_BRAND, SAMPLE_STORE, TemplateSchema, checkCondition } from "./index.js";
 
 const ctx = buildContext(SAMPLE_BILL, { brand: SAMPLE_BRAND, store: SAMPLE_STORE, links: { pdf: "/b/abc/pdf", verify: "https://leksy.in/v/abc" } });
 
@@ -92,5 +92,18 @@ describe("amount in words", () => {
     expect(interpolate("{{v | words}}", { v: 25412345.5 })).toBe("Rupees Two Crore Fifty Four Lakh Twelve Thousand Three Hundred Forty Five and Fifty Paise Only");
     expect(interpolate("{{v | words}}", { v: 0 })).toBe("Rupees Zero Only");
     expect(interpolate("{{v | words}}", { v: 999 })).toBe("Rupees Nine Hundred Ninety Nine Only");
+  });
+});
+
+describe("download and share buttons", () => {
+  const t = TemplateSchema.parse({ blocks: [{ id: "dl", type: "download_buttons", props: { formats: ["pdf", "share"] } }] });
+  it("offers a direct PDF download and a share button for the same PDF", () => {
+    const html = renderTemplate(t, { links: { pdf: "https://bills.example.com/b/abc/pdf" } });
+    expect(html).toContain('href="https://bills.example.com/b/abc/pdf" download>Download PDF');
+    expect(html).toContain('class="lx-button lx-share" href="https://bills.example.com/b/abc/pdf" data-lx-share>Share');
+  });
+  it("draws the watermark once, not tiled", () => {
+    const css = templateCss(TemplateSchema.parse({ page: { watermark: { src: "x" } }, blocks: [] }));
+    expect(css).toMatch(/\.lx-wm\{[^}]*background-repeat:no-repeat;/);
   });
 });

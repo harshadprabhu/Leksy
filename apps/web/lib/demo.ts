@@ -16,7 +16,7 @@ import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const KEY = "lx_demo_v4"; // v4: the demo is ORRA Fine Jewellery (its 94 stores)
+const KEY = "lx_demo_v5"; // v5: ORRA Fine Jewellery (its 94 stores), bills with Share
 const DAY = 864e5;
 
 interface DemoBill {
