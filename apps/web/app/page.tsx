@@ -1,7 +1,8 @@
 "use client";
 import { categoriesFor, themesFor, type Dataset } from "@leksy/insights";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Shell } from "@/components/Shell";
 import { change, crunch, fmt, fmtInr, group, inScope, METRICS, PALETTE, REGION_COLORS, storeMeta, value, weekdayHeat, type Acc, type Filter, type MetricKey, type StoreMeta } from "@/lib/analytics";
@@ -20,13 +21,38 @@ const TICK = { fill: "#8a8178", fontSize: 11 };
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 
-export default function Dashboard() {
+export default function DashboardPage() {
+  return (
+    <Suspense>
+      <Dashboard />
+    </Suspense>
+  );
+}
+
+function Dashboard() {
   const [ds, setDs] = useState<Dataset | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [tickets, setTickets] = useState<number | null>(null);
+  const [ticketRows, setTicketRows] = useState<{ storeCode: string; createdAt: string }[] | null>(null);
   const [preset, setPreset] = useState<Preset>("30");
   const [metric, setMetric] = useState<MetricKey>("revenue");
-  const [f, setF] = useState<Filter>({});
+  // The drill-down lives in the address (?region=West&city=Mumbai…): every step is a
+  // history entry, so the phone's back gesture and the browser's back button step
+  // out one level, and a drilled view can be shared as a link.
+  const sp = useSearchParams();
+  const f = useMemo<Filter>(() => {
+    const tier = Number(sp.get("tier"));
+    return {
+      ...(sp.get("region") ? { region: sp.get("region") as Filter["region"] } : {}),
+      ...(tier === 1 || tier === 2 ? { tier } : {}),
+      ...(sp.get("city") ? { city: sp.get("city")! } : {}),
+      ...(sp.get("store") ? { store: sp.get("store")! } : {}),
+    };
+  }, [sp]);
+  const setF = (next: Filter) => {
+    const qs = new URLSearchParams(Object.entries(next).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)])).toString();
+    window.history.pushState(null, "", qs ? `?${qs}` : window.location.pathname);
+    document.getElementById("drill-top")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   const [sort, setSort] = useState<{ key: MetricKey; desc: boolean }>({ key: "revenue", desc: true });
   const [allRows, setAllRows] = useState(false);
 
@@ -41,13 +67,22 @@ export default function Dashboard() {
     return { from, to };
   }, [ds, preset]);
 
+  // Unresolved tickets (open or in progress), so the tile can follow the drill-down.
   useEffect(() => {
-    if (!range) return;
-    api<{ openTickets: number }>(`/v1/analytics/summary?from=${range.from}&to=${range.to}`).then((s) => setTickets(s.openTickets), () => setTickets(null));
-  }, [range]);
+    type Row = { storeCode: string; createdAt: string };
+    Promise.all(["open", "in_progress"].map((t) => api<{ feedback: Row[] }>(`/v1/feedback?ticket=${t}&limit=200`))).then(
+      (rs) => setTicketRows(rs.flatMap((r) => r.feedback)),
+      () => setTicketRows(null),
+    );
+  }, []);
 
   const meta = useMemo(() => (ds ? storeMeta(ds) : []), [ds]);
   const scope = useMemo(() => inScope(meta, f), [meta, f]);
+  const tickets = useMemo(() => {
+    if (!ticketRows || !range) return null;
+    const ist = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10);
+    return ticketRows.filter((r) => scope.has(r.storeCode) && ist(r.createdAt) >= range.from && ist(r.createdAt) <= range.to).length;
+  }, [ticketRows, scope, range]);
   const c = useMemo(() => (ds && range ? crunch(ds, scope, range) : null), [ds, range, scope]);
 
   if (err) return <Shell><div className="err">{err}</div></Shell>;
@@ -129,6 +164,26 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      <div id="drill-top" />
+      {(f.region || f.tier || f.city || f.store) && (
+        <div className="drill-bar" role="navigation" aria-label="Drill-down">
+          <button
+            className="btn"
+            onClick={() => setF(f.store ? { region: f.region, tier: f.tier, city: f.city } : f.city ? { region: f.region, tier: f.tier } : f.region ? { tier: f.tier } : {})}
+            title="Up one level"
+          >
+            ← Back
+          </button>
+          <div className="drill-where">
+            <span className="small muted">Viewing</span>
+            <b>{[f.region, f.tier ? `Tier ${f.tier}` : null, f.city, f.store ? nameOf.get(f.store)?.name : null].filter(Boolean).join(" › ")}</b>
+          </div>
+          <button className="btn primary" onClick={() => setF({})} title="Back to the full view">
+            ⌂ All India
+          </button>
+        </div>
+      )}
 
       <div className="card filters">
         <nav className="crumbs" aria-label="Drill path">

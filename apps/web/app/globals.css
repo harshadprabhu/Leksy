@@ -394,3 +394,14 @@ pre.code { max-width: 100%; overflow: auto; }
 .ebill-bar .eb-primary { background: var(--eb-accent); color: #fff; border: 0; }
 .ebill-bar .eb-secondary { background: transparent; color: var(--eb-accent); border: 1.5px solid var(--eb-accent); }
 .ebill-note { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); background: #222; color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 999px; white-space: nowrap; box-shadow: 0 6px 20px rgba(0, 0, 0, .2); }
+
+/* ---------- Dashboard drill-down: always a way back ---------- */
+#drill-top { scroll-margin-top: 70px; }
+.drill-bar { position: sticky; top: 8px; z-index: 15; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 10px; border-radius: 14px; background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--brand-gold); box-shadow: 0 8px 24px -14px rgba(0, 0, 0, .35); animation: drill-in .25s ease-out; }
+.drill-bar .btn { white-space: nowrap; min-height: 38px; }
+.drill-bar .btn.primary { background: var(--brand); border-color: var(--brand); }
+.drill-where { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.drill-where b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes drill-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (max-width: 900px) { .drill-bar { top: 60px; } #drill-top { scroll-margin-top: 120px; } }
+@media (max-width: 600px) { .drill-bar { gap: 6px; padding: 6px 8px; } .drill-bar .btn { padding: 6px 10px; font-size: 13px; } .drill-where b { font-size: 13px; } }
