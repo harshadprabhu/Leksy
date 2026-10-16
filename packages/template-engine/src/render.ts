@@ -260,7 +260,7 @@ export function templateCss(t: Template): string {
   return `
 .lx-page{box-sizing:border-box;max-width:${width};margin:0 auto;padding:${p.padding}px;background:${safeColor(p.background) ?? "#fff"}${bgImg ? ` url('${bgImg}') center/cover` : ""};color:${safeColor(p.textColor) ?? "#1a1a1a"};font-family:'${font}',system-ui,sans-serif;font-size:14px;line-height:1.5}
 .lx-page *{box-sizing:border-box}
-.lx-page{position:relative}
+.lx-page{position:relative;--lx-accent:${accent}}
 .lx-wm{position:absolute;inset:0;pointer-events:none;background-repeat:no-repeat space;background-position:center 60px;z-index:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .lx-page>.lx-block{position:relative;z-index:1}
 .lx-page h1,.lx-page h2,.lx-page h3{font-family:'${heading}',serif;margin:0;font-weight:500;line-height:1.2}

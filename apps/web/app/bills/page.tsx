@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Face, FACE_LABELS, PageHero } from "@/components/PageHero";
 import { Shell } from "@/components/Shell";
 import { api, dt, inr } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
@@ -33,6 +34,7 @@ export default function Bills() {
   const [query, setQuery] = useState("");
   const { data, error, reload } = useApi<{ bills: Row[]; total?: number }>(`/v1/bills?limit=100${query ? `&q=${encodeURIComponent(query)}` : ""}`);
   const [open, setOpen] = useState<Detail | null>(null);
+  const kpi = useApi<{ bills: number; sent: number; opened: number; responses: number; avgRating: number | null; revenue: number }>("/v1/analytics/summary");
   // Opened from the dashboard with ?q=STORE: start with that search.
   useEffect(() => {
     const v = new URLSearchParams(window.location.search).get("q");
@@ -43,13 +45,22 @@ export default function Bills() {
   }, []);
   return (
     <Shell>
-      <div className="head">
-        <div>
-          <h1>Bills</h1>
-          <div className="muted">Every bill received, how it was delivered, and what the customer said.</div>
-        </div>
+      <PageHero
+        kicker="Bills"
+        title="Every bill, beautifully delivered"
+        sub="Sent on WhatsApp the moment it's billed: opened, verified and rated by your customers."
+        stats={
+          kpi.data
+            ? [
+                { value: kpi.data.bills.toLocaleString("en-IN"), label: "bills, last 30 days" },
+                { value: kpi.data.sent ? `${Math.round((100 * kpi.data.opened) / kpi.data.sent)}%` : "–", label: "opened by customers" },
+                { value: kpi.data.avgRating != null ? `${kpi.data.avgRating.toFixed(2)} ★` : "–", label: "customer happiness" },
+              ]
+            : []
+        }
+      >
         <form
-          className="row"
+          className="row hero-search"
           onSubmit={(e) => {
             e.preventDefault();
             setQuery(q);
@@ -61,11 +72,11 @@ export default function Bills() {
             Refresh
           </button>
         </form>
-      </div>
+      </PageHero>
       {error && <div className="err">{error}</div>}
       <div className="grid two" style={{ gridTemplateColumns: open ? "1.3fr 1fr" : "1fr" }}>
         <div className="card" style={{ overflow: "auto" }}>
-          <table className="t">
+          <table className="t branded">
             <thead>
               <tr>
                 <th>Invoice</th>
@@ -81,20 +92,20 @@ export default function Bills() {
             <tbody>
               {data?.bills.map((b) => (
                 <tr key={b.id} className="click" onClick={async () => setOpen(await api<Detail>(`/v1/bills/${b.id}`))}>
-                  <td>{b.invoiceNo}</td>
+                  <td className="nowrap mono">{b.invoiceNo}</td>
                   <td>
                     {b.storeName ?? b.storeCode} <span className="muted small mono">{b.storeCode}</span>
                   </td>
-                  <td className="muted">{dt(b.issuedAt)}</td>
-                  <td className="num">{inr(b.total)}</td>
+                  <td className="muted nowrap">{dt(b.issuedAt)}</td>
+                  <td className="num nowrap">{inr(b.total)}</td>
                   <td>
                     <span className="badge">{b.source}</span>
                   </td>
                   <td>
                     <span className={`badge ${STATUS[b.status] ?? ""}`}>{b.status}</span>
                   </td>
-                  <td className="muted">{b.openedAt ? dt(b.openedAt) : "–"}</td>
-                  <td>{b.rating ? <span className={`badge ${b.rating <= 2 ? "bad" : b.rating >= 4 ? "good" : "warn"}`}>{b.rating}★</span> : "–"}</td>
+                  <td className="muted nowrap">{b.openedAt ? dt(b.openedAt) : "–"}</td>
+                  <td>{b.rating ? <span className="face-cell"><Face rating={b.rating} /> {b.rating}</span> : <span className="muted">–</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -158,8 +169,23 @@ export default function Bills() {
             {open.feedback && (
               <div>
                 <h3>Feedback</h3>
-                <div>{"★".repeat(open.feedback.rating)}{"☆".repeat(5 - open.feedback.rating)}</div>
-                <pre className="code">{JSON.stringify(open.feedback.answers, null, 2)}</pre>
+                <div className="fb-big">
+                  <Face rating={open.feedback.rating} size={52} />
+                  <div>
+                    <b>{FACE_LABELS[open.feedback.rating - 1]}</b>
+                    <div className="small muted">{open.feedback.rating} of 5</div>
+                  </div>
+                </div>
+                <div className="stack" style={{ gap: 4, marginTop: 8 }}>
+                  {Object.entries(open.feedback.answers)
+                    .filter(([k]) => k !== "overall")
+                    .map(([k, v]) => (
+                      <div key={k} className="spread small">
+                        <span className="muted">{k.replace(/_/g, " ")}</span>
+                        <span>{Array.isArray(v) ? v.join(", ") : String(v)}</span>
+                      </div>
+                    ))}
+                </div>
               </div>
             )}
             <div>

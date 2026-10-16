@@ -105,7 +105,13 @@ export const adminRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
     if (q.ticket) where.push(eq(feedback.ticketStatus, q.ticket));
     if (q.store) where.push(eq(feedback.storeCode, q.store));
     if (q.maxRating) where.push(sql`${feedback.rating} <= ${q.maxRating}`);
-    return { feedback: await d.db.query.feedback.findMany({ where: and(...where), orderBy: desc(feedback.createdAt), limit: q.limit }) };
+    const [rows, counts] = await Promise.all([
+      d.db.query.feedback.findMany({ where: and(...where), orderBy: desc(feedback.createdAt), limit: q.limit }),
+      d.db.select({ rating: feedback.rating, n: sql<number>`count(*)::int` }).from(feedback).where(and(...where)).groupBy(feedback.rating),
+    ]);
+    // How many responses gave each rating, 1 to 5, across everything matched (not just this page).
+    const dist = [1, 2, 3, 4, 5].map((r) => counts.find((c) => c.rating === r)?.n ?? 0);
+    return { total: dist.reduce((a, b) => a + b, 0), dist, feedback: rows };
   });
   app.patch<{ Params: { id: string } }>("/v1/feedback/:id", { preHandler: userAuth(["owner", "admin", "manager"]) }, async (req, reply) => {
     const body = z.object({ ticketStatus: z.enum(["open", "in_progress", "resolved"]), resolutionNote: z.string().max(2000).optional() }).parse(req.body);

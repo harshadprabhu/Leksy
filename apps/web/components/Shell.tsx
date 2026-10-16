@@ -1,10 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { api, auth, DEMO } from "@/lib/api";
 import { applyAppTheme, clearPack, loadPack, storePackFile, type BrandKit } from "@/lib/brandpack";
 import { load, resetDemo } from "@/lib/demo";
+
+const BrandContext = createContext<BrandKit | null>(null);
+/** The brand kit for pages inside the shell (null when the brand has none). */
+export const useBrand = () => useContext(BrandContext);
 
 /** The brand's kit (logo, colours, watermark), re-read when Settings changes it. */
 function useBrandKit(ready: boolean) {
@@ -84,7 +88,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       {kit?.watermark && (kit.mark ?? kit.logo) && <div className="app-wm" aria-hidden="true" style={{ backgroundImage: `url(${kit.mark ?? kit.logo})` }} />}
       <main className="main">
         {DEMO && <DemoBar />}
-        {children}
+        <BrandContext.Provider value={kit}>{children}</BrandContext.Provider>
       </main>
     </div>
   );

@@ -260,17 +260,20 @@ function seed(): DemoState {
       if (at.getTime() > now) continue;
       const bill = makeBill(rand, at, st.code, ++state.seq);
       const row = addBill(state, bill, "api", at);
-      if (rand() < 0.74) {
-        row.openedAt = new Date(at.getTime() + (5 + rand() * 120) * 60e3).toISOString();
+      // Opened 5–125 minutes after billing, never in the future.
+      const openT = at.getTime() + (5 + rand() * 120) * 60e3;
+      if (rand() < 0.74 && openT < now - 4 * 60e3) {
+        row.openedAt = new Date(openT).toISOString();
         row.status = "delivered";
         if (rand() < 0.48) {
-          const base = storeProfile(st).mood + (rand() - 0.5) * 2.2;
+          // Most visits follow the store's mood; about 1 in 12 goes badly wrong.
+          const base = storeProfile(st).mood + (rand() - 0.5) * 2.2 - (rand() < 0.08 ? 2 : 0);
           const rating = Math.max(1, Math.min(5, Math.round(base)));
           const improve = rating <= 3 ? pickSome(rand, slow.has(st.city) ? ["Waiting time", "Waiting time", "Billing", "Staff help"] : THEMES.filter((t) => t !== "Waiting time")) : undefined;
           const loved = rating >= 4 ? pickSome(rand, ["Staff help", "Product range", "Store ambience", "Quick billing"]) : undefined;
           const answers: Record<string, unknown> = { overall: rating, nps: Math.max(0, Math.min(10, rating * 2 + Math.round(rand() * 2 - 1))), ...(improve ? { improve } : {}), ...(loved ? { loved } : {}) };
           if (rating <= 2 && rand() < 0.6) answers.comment = slow.has(st.city) ? "Waited almost 25 minutes at the billing counter." : "The staff seemed busy and didn't explain the making charges.";
-          const fb = feedbackRow(state, row, rating, answers, new Date(new Date(row.openedAt).getTime() + 3 * 60e3));
+          const fb = feedbackRow(state, row, rating, answers, new Date(Math.min(now - 60e3, new Date(row.openedAt).getTime() + 3 * 60e3)));
           if (fb.ticketStatus === "open" && d > 2) {
             fb.ticketStatus = rand() < 0.7 ? "resolved" : "open";
             if (fb.ticketStatus === "resolved") fb.resolutionNote = "Called the customer, apologised and offered free cleaning.";
@@ -350,6 +353,8 @@ export function load(): DemoState {
     if (raw) {
       cache = JSON.parse(raw) as DemoState;
       cache.surveys ??= defaultSurveys(); // data saved before surveys were editable
+      // Surveys saved before rating styles existed: ask the happiness question with faces.
+      for (const sv of cache.surveys) for (const q of sv.body.questions) if (q.type === "rating" && q.id === sv.body.primary && !q.style) q.style = "faces";
       return cache;
     }
   } catch {}
@@ -725,7 +730,8 @@ function route(s: DemoState, method: string, seg: string[], q: URLSearchParams, 
     }
     const ticket = q.get("ticket");
     const matched = s.feedback.filter((f) => !ticket || f.ticketStatus === ticket);
-    return { total: matched.length, feedback: matched.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, Number(q.get("limit") ?? 50)) };
+    const dist = [1, 2, 3, 4, 5].map((r) => matched.filter((f) => f.rating === r).length);
+    return { total: matched.length, dist, feedback: matched.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, Number(q.get("limit") ?? 50)) };
   }
 
   if (res === "stores") {

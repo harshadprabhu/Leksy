@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Face, FACE_COLORS, FACE_LABELS, PageHero } from "@/components/PageHero";
 import { Shell } from "@/components/Shell";
 import { api, dt } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
@@ -27,7 +28,10 @@ const FILTERS = [
 
 export default function Feedback() {
   const [ticket, setTicket] = useState("");
-  const { data, reload } = useApi<{ feedback: Row[]; total?: number }>(`/v1/feedback?limit=100${ticket ? `&ticket=${ticket}` : ""}`);
+  const kpi = useApi<{ responses: number; avgRating: number | null; nps: number | null; openTickets: number }>("/v1/analytics/summary");
+  const stores = useApi<{ stores: { code: string; name: string }[] }>("/v1/stores");
+  const names = new Map((stores.data?.stores ?? []).map((x) => [x.code, x.name]));
+  const { data, reload } = useApi<{ feedback: Row[]; total?: number; dist?: number[] }>(`/v1/feedback?limit=100${ticket ? `&ticket=${ticket}` : ""}`);
   const update = async (id: string, ticketStatus: Row["ticketStatus"]) => {
     const note = ticketStatus === "resolved" ? (prompt("How was it resolved?") ?? undefined) : undefined;
     await api(`/v1/feedback/${id}`, { method: "PATCH", body: { ticketStatus, resolutionNote: note } });
@@ -35,11 +39,50 @@ export default function Feedback() {
   };
   return (
     <Shell>
-      <div className="head">
-        <div>
-          <h1>Mission Happiness</h1>
-          <div className="muted">Every response, with low scores turned into tickets for the store team.</div>
+      <PageHero
+        kicker="Mission Happiness"
+        title="How your customers feel"
+        sub="Every response from the bill, with unhappy customers turned into tickets for the store team."
+        stats={
+          kpi.data
+            ? [
+                { value: kpi.data.responses.toLocaleString("en-IN"), label: "responses, last 30 days" },
+                { value: kpi.data.avgRating != null ? `${kpi.data.avgRating.toFixed(2)} ★` : "–", label: "average happiness" },
+                { value: kpi.data.nps != null ? String(Math.round(kpi.data.nps)) : "–", label: "NPS" },
+                { value: String(kpi.data.openTickets), label: "open tickets" },
+              ]
+            : []
+        }
+      />
+
+      {data?.dist && (
+        <div className="card faces-dist">
+          <div className="spread">
+            <h2 style={{ margin: 0 }}>What customers tapped</h2>
+            <span className="small muted">{(data.total ?? 0).toLocaleString("en-IN")} itemised responses in this inbox{ticket ? " with this ticket status" : ""}</span>
+          </div>
+          <div className="faces-row">
+            {data.dist.map((n, i) => {
+              const total = Math.max(1, data.dist!.reduce((a, b) => a + b, 0));
+              const most = Math.max(1, ...data.dist!);
+              return (
+                <div key={i} className="face-col" style={{ "--fc": FACE_COLORS[i] } as React.CSSProperties}>
+                  <Face rating={i + 1} size={40} />
+                  <b>{((100 * n) / total).toFixed(0)}%</b>
+                  <div className="face-track">
+                    <i style={{ height: `${(100 * n) / most}%` }} />
+                  </div>
+                  <span className="small">{FACE_LABELS[i]}</span>
+                  <span className="small muted">{n.toLocaleString("en-IN")}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
+      )}
+
+      <div className="spread" style={{ margin: "14px 0 10px" }}>
+        <h2 style={{ margin: 0 }}>Responses</h2>
         <div className="seg">
           {FILTERS.map(([k, l]) => (
             <button key={k} className={ticket === k ? "on" : ""} onClick={() => setTicket(k)}>
@@ -49,7 +92,7 @@ export default function Feedback() {
         </div>
       </div>
       <div className="card">
-        <table className="t">
+        <table className="t branded">
           <thead>
             <tr>
               <th>When</th>
@@ -72,15 +115,27 @@ export default function Feedback() {
                 .map(([k, v]) => `${k.replace(/_/g, " ")}: ${Array.isArray(v) ? v.join(", ") : String(v)}`);
               return (
                 <tr key={f.id}>
-                  <td className="muted">{dt(f.createdAt)}</td>
-                  <td>{f.storeCode}</td>
+                  <td className="muted nowrap">{dt(f.createdAt)}</td>
+                  <td>
+                    {names.get(f.storeCode) ?? f.storeCode} <span className="muted small mono">{f.storeCode}</span>
+                  </td>
                   <td>{f.staffId ?? "–"}</td>
                   <td>
-                    <span className={`badge ${f.rating <= 2 ? "bad" : f.rating >= 4 ? "good" : "warn"}`}>{f.rating}★</span>
+                    <span className="face-cell" title={FACE_LABELS[f.rating - 1]}>
+                      <Face rating={f.rating} size={26} /> {f.rating}
+                    </span>
                   </td>
                   <td>{f.nps ?? "–"}</td>
                   <td>
-                    {issues.length > 0 && <div className="small">{issues.join(" · ")}</div>}
+                    {issues.length > 0 && (
+                      <div className="tags">
+                        {issues.map((x) => (
+                          <span key={x} className={`tag ${x.startsWith("♥") ? "love" : "fix"}`}>
+                            {x}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {f.comment && <div className="small muted">“{f.comment}”</div>}
                     {extra.length > 0 && <div className="small muted">{extra.join(" · ")}</div>}
                   </td>

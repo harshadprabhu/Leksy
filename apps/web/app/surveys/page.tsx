@@ -16,7 +16,7 @@ interface Row {
 }
 
 const TYPES: [Question["type"], string][] = [
-  ["rating", "Stars (1–5)"],
+  ["rating", "Rating (1–5)"],
   ["nps", "Recommend (0–10)"],
   ["choice", "Pick one"],
   ["multi", "Pick several"],
@@ -183,6 +183,12 @@ export default function Surveys() {
                       </option>
                     ))}
                   </select>
+                  {q.type === "rating" && (
+                    <select aria-label="Rating style" value={q.style ?? "stars"} onChange={(e) => setQ(i, { style: e.target.value as "faces" | "stars" })}>
+                      <option value="faces">😞→😄 Faces</option>
+                      <option value="stars">★ Stars</option>
+                    </select>
+                  )}
                   {q.id === edit.body.primary && <span className="badge good">Happiness score</span>}
                   <div style={{ flex: 1 }} />
                   <button className="btn sm" onClick={() => moveQ(i, -1)} title="Move up">

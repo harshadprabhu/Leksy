@@ -6,6 +6,8 @@ export const QuestionSchema = z.object({
   label: z.string().max(300),
   options: z.array(z.string().max(80)).max(20).optional(),
   required: z.boolean().default(false),
+  /** How a 1–5 rating is asked: five faces from sad to happy, or stars. */
+  style: z.enum(["faces", "stars"]).optional(),
   /** Show only when an earlier answer matches, e.g. { question: "overall", op: "lte", value: 3 }. */
   showIf: z.object({ question: z.string(), op: z.enum(["lte", "gte", "eq", "includes"]), value: z.union([z.number(), z.string()]) }).optional(),
 });
@@ -24,7 +26,7 @@ export type Question = z.infer<typeof QuestionSchema>;
 export const MISSION_HAPPINESS: Survey = SurveySchema.parse({
   title: "Mission Happiness",
   questions: [
-    { id: "overall", type: "rating", label: "How happy are you with your visit today?", required: true },
+    { id: "overall", type: "rating", style: "faces", label: "How happy are you with your visit today?", required: true },
     { id: "improve", type: "multi", label: "What could we do better?", options: ["Store ambience", "Staff help", "Product range", "Waiting time", "Billing", "Pricing"], showIf: { question: "overall", op: "lte", value: 3 } },
     { id: "loved", type: "multi", label: "What did you love?", options: ["Store ambience", "Staff help", "Product range", "Quick billing", "Pricing"], showIf: { question: "overall", op: "gte", value: 4 } },
     { id: "ambience", type: "rating", label: "How was the store ambience?" },
