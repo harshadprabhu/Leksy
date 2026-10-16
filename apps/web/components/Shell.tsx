@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, auth, DEMO } from "@/lib/api";
-import { applyAppTheme, clearPack, loadPack, storePackFile, type BrandKit } from "@/lib/brandpack";
+import { applyAppTheme, clearPack, loadPack, packFromHash, savePack, storePackFile, type BrandKit } from "@/lib/brandpack";
 import { load, resetDemo } from "@/lib/demo";
 
 const BrandContext = createContext<BrandKit | null>(null);
@@ -47,11 +47,30 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [opening, setOpening] = useState(false);
+  // Demo: a private pack link (…/#pack=…) switches the demo to that brand.
+  useEffect(() => {
+    if (!DEMO || !window.location.hash.startsWith("#pack=")) return;
+    setOpening(true);
+    packFromHash(window.location.hash)
+      .then((p) => {
+        if (p) {
+          savePack(p);
+          resetDemo();
+        }
+      })
+      .catch(() => alert("This brand link is damaged or incomplete. Ask for the link again, or load the pack file instead."))
+      .finally(() => {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+        window.location.reload();
+      });
+  }, []);
   useEffect(() => {
     if (!auth.token) router.replace("/login");
     else setReady(true);
   }, [router]);
   const kit = useBrandKit(ready);
+  if (opening) return <div className="empty">Opening the brand demo…</div>;
   if (!ready) return null;
   const sideLogo = kit?.ui ? (kit.logoLight ?? kit.logo) : kit?.logo;
   return (

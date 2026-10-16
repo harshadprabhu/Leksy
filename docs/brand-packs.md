@@ -1,6 +1,6 @@
 # Brand packs
 
-A brand pack is one JSON file that makes Leksy look like a client: name, logos, watermark, colours, fonts, store list and bespoke bill templates. Load it from the **Load brand pack…** button in the demo bar (every page), or in **Settings → Brand kit → Import brand pack**.
+A brand pack is one JSON file that makes Leksy look like a client: name, logos, watermark, colours, fonts, store list and bespoke bill templates. Open a private pack link (`https://…/Leksy/#pack=…`, made with `node scripts/pack-link.mjs pack.json`), or load it from the **Load brand pack…** button in the demo bar (every page), or in **Settings → Brand kit → Import brand pack**.
 
 - **Demo:** the pack is kept only in the browser (`localStorage`) and the demo rebuilds itself around it: stores, history, bills, templates and theme. "Remove pack" returns to the sample brand. Pilot assets are never published on the public site.
 - **Production:** importing updates the brand, adds or updates the pack's templates (published as new versions) and adds any new stores.
@@ -42,3 +42,7 @@ Region and tier are filled in from the city when left out. Images must be embedd
 | Dashboard and app | logo in the sidebar, app colour, heading and body fonts, faint watermark |
 | Insights | branded header with logo and headline figures, brand serif headings, gold accents, multicolour charts, deck cover preview |
 | Insights deck | logo on a dark cover, corner logo and watermark on every slide, brand colours and footer |
+
+## Private pack links
+
+A pack can travel inside a link: `https://harshadprabhu.github.io/Leksy/#pack=<gzip + base64url JSON>`. Everything after `#` stays in the browser — it is never sent to GitHub Pages or stored in this repository — and opening the link switches the demo to that brand. Shrink logos first (about 260 px wide) so the link stays around 20,000 characters, which browsers, WhatsApp and email all accept. Anyone with the link sees the brand, so share it only with the people the pitch is for.

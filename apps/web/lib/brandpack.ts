@@ -156,3 +156,17 @@ export async function storePackFile(file: File): Promise<BrandPack> {
   savePack(pack);
   return pack;
 }
+
+/**
+ * Private pack links: `…/#pack=<gzip+base64url JSON>`. The part after "#" never
+ * leaves the browser, so a client's pack can be shared as a link without being
+ * uploaded to the site or stored in the repository.
+ */
+export async function packFromHash(hash: string): Promise<BrandPack | null> {
+  const m = hash.match(/^#pack=([A-Za-z0-9_-]+)$/);
+  if (!m) return null;
+  const b64 = m[1]!.replace(/-/g, "+").replace(/_/g, "/");
+  const bytes = Uint8Array.from(atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0));
+  const text = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+  return parsePack(JSON.parse(text));
+}
