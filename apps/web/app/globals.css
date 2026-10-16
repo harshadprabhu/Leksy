@@ -405,3 +405,10 @@ pre.code { max-width: 100%; overflow: auto; }
 @keyframes drill-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @media (max-width: 900px) { .drill-bar { top: 60px; } #drill-top { scroll-margin-top: 120px; } }
 @media (max-width: 600px) { .drill-bar { gap: 6px; padding: 6px 8px; } .drill-bar .btn { padding: 6px 10px; font-size: 13px; } .drill-where b { font-size: 13px; } }
+
+/* ---------- A way back on every chart ---------- */
+.drill-bar { position: static; }
+.card-nav { display: flex; align-items: center; gap: 6px; margin: -4px 0 10px; padding: 0 0 8px; border-bottom: 1px dashed var(--line); font-size: 12px; }
+.card-nav button { flex: none; border: 1px solid color-mix(in srgb, var(--brand-gold) 60%, transparent); background: color-mix(in srgb, var(--brand-gold) 10%, var(--panel)); color: var(--ink); border-radius: 999px; padding: 4px 11px; font: inherit; font-weight: 600; cursor: pointer; min-height: 30px; }
+.card-nav button:hover { border-color: var(--brand-gold); background: color-mix(in srgb, var(--brand-gold) 20%, var(--panel)); }
+.card-nav-here { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); text-align: center; }

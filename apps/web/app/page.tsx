@@ -2,7 +2,7 @@
 import { categoriesFor, themesFor, type Dataset } from "@leksy/insights";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Shell } from "@/components/Shell";
 import { change, crunch, fmt, fmtInr, group, inScope, METRICS, PALETTE, REGION_COLORS, storeMeta, value, weekdayHeat, type Acc, type Filter, type MetricKey, type StoreMeta } from "@/lib/analytics";
@@ -39,6 +39,7 @@ function Dashboard() {
   // history entry, so the phone's back gesture and the browser's back button step
   // out one level, and a drilled view can be shared as a link.
   const sp = useSearchParams();
+  const lastCard = useRef<Element | null>(null);
   const f = useMemo<Filter>(() => {
     const tier = Number(sp.get("tier"));
     return {
@@ -48,10 +49,29 @@ function Dashboard() {
       ...(sp.get("store") ? { store: sp.get("store")! } : {}),
     };
   }, [sp]);
+  // Whatever chart or table was tapped stays at the same place on screen while
+  // the rest of the page updates around it.
+  const anchor = useRef<{ el: Element; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const a = anchor.current;
+    anchor.current = null;
+    if (!a || !a.el.isConnected) return;
+    const keep = () => window.scrollBy(0, a.el.getBoundingClientRect().top - a.top);
+    keep();
+    // Charts settle their size a moment later; hold the position until they have.
+    let n = 0;
+    const tick = () => {
+      keep();
+      if (++n < 12) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [f]);
   const setF = (next: Filter) => {
+    const el = (document.activeElement as Element | null)?.closest?.(".card") ?? lastCard.current;
+    if (el) anchor.current = { el, top: el.getBoundingClientRect().top };
     const qs = new URLSearchParams(Object.entries(next).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)])).toString();
+    // The page stays where it is: the chart you tapped simply shows the next level.
     window.history.pushState(null, "", qs ? `?${qs}` : window.location.pathname);
-    document.getElementById("drill-top")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   const [sort, setSort] = useState<{ key: MetricKey; desc: boolean }>({ key: "revenue", desc: true });
   const [allRows, setAllRows] = useState(false);
@@ -146,6 +166,26 @@ function Dashboard() {
   const cities = [...new Set(meta.filter((s) => (!f.region || s.region === f.region) && (!f.tier || s.tier === f.tier)).map((s) => s.city))].sort();
   const storesInCity = f.city ? meta.filter((s) => s.city === f.city && (!f.tier || s.tier === f.tier)) : [];
   const M = METRICS[metric];
+  // A way back on every chart: one level up, or straight to All India.
+  const drilled = !!(f.region || f.tier || f.city || f.store);
+  const parent: Filter = f.store ? { region: f.region, tier: f.tier, city: f.city } : f.city ? { region: f.region, tier: f.tier } : f.region ? { tier: f.tier } : {};
+  const parentName = f.store ? f.city : f.city ? f.region ?? (f.tier ? `Tier ${f.tier}` : "All India") : f.region && f.tier ? `Tier ${f.tier}` : "All India";
+  const here = [f.region, f.tier ? `Tier ${f.tier}` : null, f.city, f.store ? nameOf.get(f.store)?.name : null].filter(Boolean).join(" › ");
+  const cardNav = drilled ? (
+    <div className="card-nav">
+      <button onClick={() => setF(parent)} title={`Back to ${parentName}`}>
+        ← {parentName}
+      </button>
+      <span className="card-nav-here" title={here}>
+        {here}
+      </span>
+      {Object.keys(parent).filter((k) => parent[k as keyof Filter] !== undefined).length > 0 && (
+        <button onClick={() => setF({})} title="Back to the full view">
+          ⌂ All India
+        </button>
+      )}
+    </div>
+  ) : null;
 
   return (
     <Shell>
@@ -164,26 +204,6 @@ function Dashboard() {
           ))}
         </div>
       </div>
-
-      <div id="drill-top" />
-      {(f.region || f.tier || f.city || f.store) && (
-        <div className="drill-bar" role="navigation" aria-label="Drill-down">
-          <button
-            className="btn"
-            onClick={() => setF(f.store ? { region: f.region, tier: f.tier, city: f.city } : f.city ? { region: f.region, tier: f.tier } : f.region ? { tier: f.tier } : {})}
-            title="Up one level"
-          >
-            ← Back
-          </button>
-          <div className="drill-where">
-            <span className="small muted">Viewing</span>
-            <b>{[f.region, f.tier ? `Tier ${f.tier}` : null, f.city, f.store ? nameOf.get(f.store)?.name : null].filter(Boolean).join(" › ")}</b>
-          </div>
-          <button className="btn primary" onClick={() => setF({})} title="Back to the full view">
-            ⌂ All India
-          </button>
-        </div>
-      )}
 
       <div className="card filters">
         <nav className="crumbs" aria-label="Drill path">
@@ -258,8 +278,9 @@ function Dashboard() {
         </Link>
       </div>
 
-      <div className="dash-grid">
+      <div className="dash-grid" onPointerDownCapture={(e) => (lastCard.current = (e.target as Element).closest(".card"))}>
         <div className="card span2">
+          {cardNav}
           <div className="spread">
             <h2 style={{ margin: 0 }}>
               <span className="dot" style={{ background: M.color }} /> {M.label} by day
@@ -292,6 +313,8 @@ function Dashboard() {
         </div>
 
         <div className="card">
+
+          {cardNav}
           <h2>Share of revenue by {level}</h2>
           <ResponsiveContainer width="100%" height={230}>
             <PieChart>
@@ -313,6 +336,8 @@ function Dashboard() {
         </div>
 
         <div className="card">
+
+          {cardNav}
           <h2>
             {M.label} by {level} {level !== "store" && <span className="small muted">· click a bar to drill in</span>}
           </h2>
@@ -331,6 +356,8 @@ function Dashboard() {
         </div>
 
         <div className="card">
+
+          {cardNav}
           <h2>Tier 1 vs Tier 2</h2>
           <div className="tier-cards">
             {[...tiers].sort().map(([k, a], i) => {
@@ -365,6 +392,8 @@ function Dashboard() {
         </div>
 
         <div className="card">
+
+          {cardNav}
           <div className="spread">
             <h2 style={{ margin: 0 }}>Category mix</h2>
             <span className="badge">last {ds.detailDays} days</span>
@@ -384,6 +413,8 @@ function Dashboard() {
         </div>
 
         <div className="card">
+
+          {cardNav}
           <div className="spread">
             <h2 style={{ margin: 0 }}>What customers want fixed</h2>
             <span className="badge">last {ds.detailDays} days</span>
@@ -407,6 +438,8 @@ function Dashboard() {
         </div>
 
         <div className="card span2">
+
+          {cardNav}
           <div className="spread">
             <h2 style={{ margin: 0 }}>{M.label} by weekday</h2>
             <span className="small muted">Darker = higher. Hover a cell for the exact figure.</span>
@@ -426,6 +459,8 @@ function Dashboard() {
         </div>
 
         <div className="card span3">
+
+          {cardNav}
           <div className="spread">
             <h2 style={{ margin: 0 }}>
               Store league · {rows.length} store{rows.length === 1 ? "" : "s"}
@@ -484,6 +519,7 @@ function Dashboard() {
 
         {f.store && (
           <div className="card span3">
+            {cardNav}
             <div className="spread">
               <h2 style={{ margin: 0 }}>Team at {nameOf.get(f.store)?.name}</h2>
               <span className="row">
