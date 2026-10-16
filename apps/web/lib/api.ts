@@ -1,6 +1,11 @@
 "use client";
 
+import { BASE_PATH, demoApi, DemoError } from "./demo";
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+/** Demo mode: no server; a browser-only backend with sample data (GitHub Pages POC). */
+export const DEMO = process.env.NEXT_PUBLIC_DEMO === "1";
+export { BASE_PATH };
 
 export class ApiError extends Error {
   constructor(public status: number, public body: unknown) {
@@ -10,6 +15,7 @@ export class ApiError extends Error {
 
 export const auth = {
   get token() {
+    if (DEMO) return "demo";
     try {
       return localStorage.getItem("lx_token");
     } catch {
@@ -29,6 +35,14 @@ export const auth = {
 };
 
 export async function api<T = unknown>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  if (DEMO) {
+    try {
+      return await demoApi<T>(path, init.method ?? (init.body !== undefined ? "POST" : "GET"), init.body);
+    } catch (e) {
+      if (e instanceof DemoError) throw new ApiError(e.status, { error: e.message });
+      throw e;
+    }
+  }
   const res = await fetch(`${API_URL}${path}`, {
     method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
     headers: { ...(init.body !== undefined ? { "content-type": "application/json" } : {}), ...(auth.token ? { authorization: `Bearer ${auth.token}` } : {}) },
@@ -36,7 +50,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
   });
   if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/v1/auth")) {
     auth.clear();
-    window.location.href = "/login";
+    window.location.href = `${BASE_PATH}/login/`;
   }
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => ({}));

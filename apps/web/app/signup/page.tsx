@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { api, auth } from "@/lib/api";
 
@@ -24,9 +25,9 @@ export default function Signup() {
             API key
             <input readOnly value={done.apiKey} className="mono" onFocus={(e) => e.target.select()} />
           </label>
-          <a className="btn primary" href="/">
+          <Link className="btn primary" href="/">
             Go to dashboard
-          </a>
+          </Link>
         </div>
       </div>
     );

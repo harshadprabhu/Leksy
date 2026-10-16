@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Shell } from "@/components/Shell";
 import { api, API_URL, dt } from "@/lib/api";
@@ -19,6 +20,7 @@ interface Connector {
 }
 
 export default function Connectors() {
+  const router = useRouter();
   const { data, reload } = useApi<{ connectors: Connector[] }>("/v1/connectors");
   const [kind, setKind] = useState<"push" | "pull">("push");
   const [form, setForm] = useState({ name: "", url: "", authType: "none", token: "", billsPath: "", cursorParam: "", cursorField: "", interval: 300 });
@@ -50,7 +52,7 @@ export default function Connectors() {
                 {data?.connectors.map((c) => (
                   <tr key={c.id}>
                     <td>
-                      <Link href={`/connectors/${c.id}`}>{c.name}</Link>
+                      <Link href={`/connectors/edit?id=${c.id}`}>{c.name}</Link>
                     </td>
                     <td>
                       <span className="badge">{c.kind === "push" ? "They push to us" : `We pull every ${Math.round((c.intervalSeconds ?? 0) / 60)} min`}</span>
@@ -108,7 +110,7 @@ export default function Connectors() {
                     };
               const r = await api<Connector>("/v1/connectors", { body });
               await reload();
-              window.location.href = `/connectors/${r.id}`;
+              router.push(`/connectors/edit?id=${r.id}`);
             } catch (e) {
               setErr((e as Error).message);
             }

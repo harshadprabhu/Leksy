@@ -8,6 +8,12 @@
 - **Mission Happiness:** branching survey inside the bill, low-score alerts to the store manager with an SLA, Google-review prompt for happy customers.
 - **Analytics:** delivery, opens, ratings, NPS, store league table and improvement themes.
 
+## Live demo
+
+**https://harshadprabhu.github.io/Leksy/** — a browser-only proof of concept with sample data for a jewellery brand. Click **Simulate a sale**, open the bill as the customer, rate the visit, then watch the dashboard and the Mission Happiness inbox update. Change the bill's design in Template Studio, publish, and reload the bill. Nothing is sent and no server is involved; data lives in your browser (use **Reset demo** to start over).
+
+Build it yourself: `NEXT_PUBLIC_DEMO=1 NEXT_PUBLIC_BASE_PATH=/Leksy pnpm --filter @leksy/web build` → `apps/web/out`.
+
 ## Architecture
 
 ```

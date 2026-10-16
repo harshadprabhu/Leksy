@@ -6,7 +6,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { randomInt } from "node:crypto";
 import { z } from "zod";
 import type { Deps } from "../app.js";
-import { otpPage, SURVEY_CSS, SURVEY_JS, surveyHtml } from "../billpage.js";
+import { otpPage, SURVEY_CSS, SURVEY_JS, surveyHtml } from "@leksy/survey";
 
 const TOKEN = /^[0-9A-Za-z]{22}$/;
 

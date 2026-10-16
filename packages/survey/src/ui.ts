@@ -1,4 +1,4 @@
-import type { Survey } from "@leksy/core";
+import type { Survey } from "./survey.js";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
@@ -58,9 +58,10 @@ f.querySelectorAll('.lx-q').forEach(function(q){var id=q.dataset.id,t=q.dataset.
  var ta=q.querySelector('textarea'); if(ta) ta.addEventListener('input',function(){ans[id]=ta.value;});});
 f.addEventListener('submit',function(e){e.preventDefault();var err=f.querySelector('.lx-err');err.hidden=true;
  var btn=f.querySelector('.lx-submit');btn.disabled=true;
- fetch(location.pathname.replace(/\\/$/,'')+'/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({answers:ans})})
- .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
- .then(function(r){if(!r.ok){err.textContent=r.j.error||'Something went wrong';err.hidden=false;btn.disabled=false;return;}
+ // window.LX_SUBMIT lets a host page (the demo) take the answers instead of the API.
+ var submit=window.LX_SUBMIT||function(a){return fetch(location.pathname.replace(/\\/$/,'')+'/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({answers:a})})
+  .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});});};
+ submit(ans).then(function(r){if(!r.ok){err.textContent=r.j.error||'Something went wrong';err.hidden=false;btn.disabled=false;return;}
   f.hidden=true;var t=document.querySelector('.lx-thanks');t.hidden=false;
   if(r.j.reviewUrl){var a=t.querySelector('.lx-review');a.href=r.j.reviewUrl;a.hidden=false;}})
  .catch(function(){err.textContent='Network error, please try again';err.hidden=false;btn.disabled=false;});});

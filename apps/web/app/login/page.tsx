@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { api, auth } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { api, auth, DEMO } from "@/lib/api";
 
 export default function Login() {
   const router = useRouter();
@@ -10,6 +10,9 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (DEMO) router.replace("/");
+  }, [router]);
   return (
     <div className="auth">
       <form

@@ -7,7 +7,8 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:demo": "NEXT_PUBLIC_DEMO=1 NEXT_PUBLIC_BASE_PATH=${BASE_PATH:-} next build"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -18,10 +19,13 @@
     "@leksy/template-engine": "workspace:*",
     "next": "15.5.28",
     "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "react-dom": "19.1.1",
+    "@leksy/survey": "workspace:*",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0"
+    "@types/react-dom": "^19.1.0",
+    "@types/qrcode": "^1.5.5"
   }
 }

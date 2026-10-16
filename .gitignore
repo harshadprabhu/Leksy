@@ -5,3 +5,5 @@ dist
 coverage
 .env
 *.log
+out
+*.tsbuildinfo

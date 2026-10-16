@@ -44,9 +44,9 @@ export default function Templates() {
             </thead>
             <tbody>
               {data?.templates.map((t) => (
-                <tr key={t.id} className="click" onClick={() => router.push(`/studio/${t.id}`)}>
+                <tr key={t.id} className="click" onClick={() => router.push(`/studio/edit?id=${t.id}`)}>
                   <td>
-                    <Link href={`/studio/${t.id}`}>{t.name}</Link>
+                    <Link href={`/studio/edit?id=${t.id}`}>{t.name}</Link>
                   </td>
                   <td className="mono">{t.key}</td>
                   <td>{t.publishedVersion ? <span className="badge good">v{t.publishedVersion}</span> : <span className="badge">draft</span>}</td>
@@ -64,7 +64,7 @@ export default function Templates() {
             const key = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "template";
             try {
               const r = await api<{ id: string }>("/v1/templates", { body: { key, name, from } });
-              router.push(`/studio/${r.id}`);
+              router.push(`/studio/edit?id=${r.id}`);
             } catch (e) {
               setErr((e as Error).message === "key_in_use" ? "A template with this name already exists." : (e as Error).message);
             }

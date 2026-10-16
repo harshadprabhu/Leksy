@@ -1,7 +1,8 @@
 "use client";
 import type { Mapping, Rule } from "@leksy/mapper";
 import Link from "next/link";
-import { use, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { api } from "@/lib/api";
 
@@ -84,8 +85,16 @@ function fromSimple(s: Simple): Rule | undefined {
 }
 
 /** Map any JSON a store system sends onto Leksy's bill, with a live check. */
-export default function MapperPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function MapperPage() {
+  return (
+    <Suspense>
+      <Mapper />
+    </Suspense>
+  );
+}
+
+function Mapper() {
+  const id = useSearchParams().get("id") ?? "";
   const [c, setC] = useState<Connector | null>(null);
   const [sample, setSample] = useState<SampleResp | null>(null);
   const [mapping, setMapping] = useState<Mapping>({});
