@@ -118,10 +118,13 @@ export const publicRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
     const bill = await load(req.params.token);
     if (!bill || !unlocked(req, bill)) return reply.code(404).send({ error: "not_found" });
     const data = bill.data as Bill;
-    const tpl = await template(bill);
+    // A brand may keep a separate printable design (e.g. an A4 tax invoice) for downloads.
+    const brand = await d.db.query.brands.findFirst({ where: (b, { eq: e }) => e(b.id, bill.brandId) });
+    const pdfKey = (brand?.settings as { pdfTemplate?: string } | null)?.pdfTemplate;
+    const tpl = pdfKey ? (await resolveTemplate(d.db, bill.brandId, pdfKey)).template : await template(bill);
     const ctx = await contextFor(d.db, bill.brandId, data, billLinks(d.cfg.PUBLIC_BASE_URL, bill.token));
     const html = await renderHtml({ ...tpl, blocks: tpl.blocks.filter((b) => b.type !== "survey" && b.type !== "download_buttons") }, ctx, { title: data.invoice_no });
-    const cacheKey = `pdf:${bill.id}:${bill.contentHash ?? contentHash(data)}:${bill.templateVersionId ?? "preset"}`;
+    const cacheKey = `pdf:${bill.id}:${bill.contentHash ?? contentHash(data)}:${pdfKey ?? bill.templateVersionId ?? "preset"}`;
     let pdf = await d.redis.getBuffer(cacheKey);
     if (!pdf) {
       pdf = await d.pdf.render(html, tpl.page.format);

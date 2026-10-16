@@ -6,7 +6,7 @@ import QRCode from "qrcode";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { DEMO } from "@/lib/api";
-import { billContext, billTemplate, findBillByToken, hasFeedback, load, markOpened, submitDemoFeedback, surveyFor } from "@/lib/demo";
+import { billContext, billTemplate, findBillByToken, hasFeedback, liveTemplate, load, markOpened, submitDemoFeedback, surveyFor } from "@/lib/demo";
 
 /**
  * What the customer sees after tapping the WhatsApp link (demo build).
@@ -47,7 +47,9 @@ function BillView() {
     }
     void (async () => {
       const s = load();
-      const tpl = billTemplate(s, bill);
+      // Downloads use the brand's printable design when it has one (e.g. an A4 tax invoice).
+      const pdfKey = printing ? (s.brand.settings?.pdfTemplate as string | undefined) : undefined;
+      const tpl = (pdfKey && liveTemplate(s, pdfKey)) || billTemplate(s, bill);
       const ctx = billContext(s, bill);
       const answered = hasFeedback(bill);
       const sv = surveyFor(bill);

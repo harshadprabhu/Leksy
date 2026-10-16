@@ -98,6 +98,11 @@ export const FORMATTERS: Record<string, (v: unknown, arg?: string) => unknown> =
   count: (v) => (Array.isArray(v) ? v.length : 0),
   sum: (v, arg) => (Array.isArray(v) ? v.reduce((s: number, el) => s + (toNumber(arg ? getPath(el, arg) : el) ?? 0), 0) : 0),
   join: (v, arg) => (Array.isArray(v) ? v.join(arg ?? ", ") : v),
+  /** Rupees in words, Indian system: "Rupees One Lakh Three Thousand and Fifty Paise Only". */
+  words: (v) => {
+    const n = toNumber(v);
+    return n == null ? "" : rupeesInWords(n);
+  },
   mask: (v) => {
     const s = v == null ? "" : String(v);
     return s.length <= 4 ? s : `${"•".repeat(Math.max(0, s.length - 4))}${s.slice(-4)}`;
@@ -152,4 +157,29 @@ export function allBindingsEmpty(template: string, ctx: Ctx): boolean {
 /** Paths a template references; used to warn when a binding has no data. */
 export function referencedPaths(template: string): string[] {
   return [...template.matchAll(/\{\{\s*([^}|]+?)\s*(?:\|[^}]*)?\}\}/g)].map((m) => m[1]!.trim());
+}
+
+const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+const twoDigits = (n: number) => (n < 20 ? ONES[n]! : `${TENS[Math.floor(n / 10)]}${n % 10 ? ` ${ONES[n % 10]}` : ""}`);
+const threeDigits = (n: number) => [n >= 100 ? `${ONES[Math.floor(n / 100)]} Hundred` : "", n % 100 ? twoDigits(n % 100) : ""].filter(Boolean).join(" ");
+
+/** Whole rupees and paise in words, Indian grouping (crore, lakh, thousand). */
+export function rupeesInWords(amount: number): string {
+  const paiseTotal = Math.round(Math.abs(amount) * 100);
+  let r = Math.floor(paiseTotal / 100);
+  const paise = paiseTotal % 100;
+  const parts: string[] = [];
+  const crore = Math.floor(r / 1e7);
+  r %= 1e7;
+  if (crore) parts.push(`${crore >= 1000 ? rupeesInWords(crore).replace(/^Rupees | Only$/g, "") : crore >= 100 ? threeDigits(crore) : twoDigits(crore)} Crore`);
+  const lakh = Math.floor(r / 1e5);
+  r %= 1e5;
+  if (lakh) parts.push(`${twoDigits(lakh)} Lakh`);
+  const thousand = Math.floor(r / 1000);
+  r %= 1000;
+  if (thousand) parts.push(`${twoDigits(thousand)} Thousand`);
+  if (r) parts.push(threeDigits(r));
+  const rupees = parts.length ? parts.join(" ") : "Zero";
+  return `Rupees ${rupees}${paise ? ` and ${twoDigits(paise)} Paise` : ""} Only`;
 }

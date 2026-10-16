@@ -3,7 +3,29 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, auth, DEMO } from "@/lib/api";
-import { resetDemo } from "@/lib/demo";
+import { applyAppTheme, type BrandKit } from "@/lib/brandpack";
+import { load, resetDemo } from "@/lib/demo";
+
+/** The brand's kit (logo, colours, watermark), re-read when Settings changes it. */
+function useBrandKit(ready: boolean) {
+  const [kit, setKit] = useState<BrandKit | null>(null);
+  useEffect(() => {
+    if (!ready) return;
+    const read = () =>
+      api<{ brand: { settings?: { brandKit?: BrandKit } } }>("/v1/me").then(
+        (m) => {
+          const k = m.brand.settings?.brandKit ?? null;
+          setKit(k);
+          applyAppTheme(k);
+        },
+        () => undefined,
+      );
+    void read();
+    window.addEventListener("lx-brand", read);
+    return () => window.removeEventListener("lx-brand", read);
+  }, [ready]);
+  return kit;
+}
 
 const NAV = [
   ["/", "Dashboard"],
@@ -25,13 +47,23 @@ export function Shell({ children }: { children: React.ReactNode }) {
     if (!auth.token) router.replace("/login");
     else setReady(true);
   }, [router]);
+  const kit = useBrandKit(ready);
   if (!ready) return null;
+  const sideLogo = kit?.ui ? (kit.logoLight ?? kit.logo) : kit?.logo;
   return (
     <div className="shell">
-      <aside className="side">
-        <div className="logo">
-          LEKSY<small>e-bills · happiness</small>
-        </div>
+      <aside className={`side ${kit?.ui ? "branded" : ""}`} style={kit?.ui ? ({ "--side": kit.ui } as React.CSSProperties) : undefined}>
+        {sideLogo ? (
+          <div className="brand-logo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={sideLogo} alt={kit!.name} />
+            <small>powered by Leksy</small>
+          </div>
+        ) : (
+          <div className="logo">
+            LEKSY<small>e-bills · happiness</small>
+          </div>
+        )}
         {NAV.map(([href, label]) => (
           <Link key={href} href={href} className={`nav ${href === "/" ? (path === "/" ? "on" : "") : path.startsWith(href) ? "on" : ""}`}>
             {label}
@@ -49,6 +81,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           Sign out
         </button>
       </aside>
+      {kit?.watermark && (kit.mark ?? kit.logo) && <div className="app-wm" aria-hidden="true" style={{ backgroundImage: `url(${kit.mark ?? kit.logo})` }} />}
       <main className="main">
         {DEMO && <DemoBar />}
         {children}
@@ -64,7 +97,7 @@ function DemoBar() {
   return (
     <div className="card demo-bar">
       <div>
-        <b>Demo mode.</b> <span className="muted">Sample data for &ldquo;Aurum &amp; Co.&rdquo;, kept in your browser. Nothing is sent.</span>
+        <b>Demo mode.</b> <span className="muted">Sample data for &ldquo;{load().brand.name}&rdquo; ({load().stores.length} stores), kept in your browser. Nothing is sent.</span>
         {last && (
           <div className="small" style={{ marginTop: 4 }}>
             Bill {last.invoice} sent on WhatsApp.{" "}

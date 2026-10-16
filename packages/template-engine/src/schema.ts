@@ -106,6 +106,14 @@ export const PageSchema = z.object({
   fontFamily: z.string().max(80).default("Inter"),
   headingFontFamily: z.string().max(80).default("Cormorant Garamond"),
   padding: z.number().min(0).max(80).default(24),
+  /** A faint brand mark repeated down the page (bill, PDF and every printed page). */
+  watermark: z
+    .object({
+      src: z.string().max(2000),
+      opacity: z.number().min(0.02).max(0.3).default(0.06),
+      size: z.number().min(10).max(100).default(55),
+    })
+    .optional(),
 });
 
 export const TemplateSchema = z.object({

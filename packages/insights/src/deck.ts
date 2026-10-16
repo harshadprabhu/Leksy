@@ -20,6 +20,10 @@ export interface DeckTheme {
   headingFont: string;
   bodyFont: string;
   logo?: string;
+  /** Logo for the dark cover (falls back to `logo`). */
+  logoLight?: string;
+  /** Faint watermark on content slides. */
+  mark?: string;
   footer: string;
 }
 
@@ -62,14 +66,19 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
   const A = hex(theme.accent);
   const HF = theme.headingFont;
   const BF = theme.bodyFont;
-  const logo = theme.logo && /^(data:image\/(png|jpeg);base64,|https:\/\/)/.test(theme.logo) ? theme.logo : undefined;
-  const logoOpts = (x: number, y: number, h: number) => (logo ? { ...(logo.startsWith("data:") ? { data: logo } : { path: logo }), x, y, h, w: h * 2.4, sizing: { type: "contain" as const, w: h * 2.4, h } } : null);
+  const okImg = (u?: string) => (u && /^(data:image\/(png|jpeg);base64,|https:\/\/)/.test(u) ? u : undefined);
+  const logo = okImg(theme.logo);
+  const src = (u: string) => (u.startsWith("data:") ? { data: u } : { path: u });
+  const logoOpts = (x: number, y: number, h: number, u = logo) => (u ? { ...src(u), x, y, h, w: h * 2.4, sizing: { type: "contain" as const, w: h * 2.4, h } } : null);
+  const coverLogo = okImg(theme.logoLight) ?? logo;
+  const mark = okImg(theme.mark);
 
   pptx.defineSlideMaster({
     title: "CONTENT",
     background: { color: "FFFFFF" },
     objects: [
       { text: { text: `${theme.company} · ${theme.footer}`, options: { x: 0.5, y: 7.0, w: 9, h: 0.3, fontFace: BF, fontSize: 9, color: MUTED, isTextBox: true } } },
+      ...(mark ? [{ image: { ...src(mark), x: 4.17, y: 1.9, w: 5.0, h: 3.7, sizing: { type: "contain" as const, w: 5.0, h: 3.7 }, transparency: 93 } }] : []),
       ...(logoOpts(11.4, 0.35, 0.45) ? [{ image: logoOpts(11.4, 0.35, 0.45)! }] : []),
     ],
     slideNumber: { x: 12.4, y: 7.0, w: 0.5, h: 0.3, fontFace: BF, fontSize: 9, color: MUTED },
@@ -110,8 +119,9 @@ export function buildLeadershipDeck(PptxGenJS: new () => Pptx, { ds, theme, answ
   {
     const s = pptx.addSlide();
     s.background = { color: P };
-    const lo = logoOpts(0.7, 0.6, 0.8);
+    const lo = logoOpts(0.6, 0.45, 1.3, coverLogo);
     if (lo) s.addImage(lo);
+    if (theme.mark && coverLogo) s.addShape("line", { x: 0.7, y: 1.9, w: 1.6, h: 0, line: { color: A, width: 1.5 } });
     s.addText(theme.company, { x: 0.7, y: 2.0, w: 11.5, h: 1.0, fontFace: HF, fontSize: 44, bold: true, color: "FFFFFF", margin: 0, isTextBox: true });
     s.addText("Leadership pack · performance, outlook, festive plan", { x: 0.7, y: 3.0, w: 11.5, h: 0.5, fontFace: BF, fontSize: 20, color: A, margin: 0, isTextBox: true });
     if (india) {

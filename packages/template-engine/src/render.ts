@@ -260,6 +260,9 @@ export function templateCss(t: Template): string {
   return `
 .lx-page{box-sizing:border-box;max-width:${width};margin:0 auto;padding:${p.padding}px;background:${safeColor(p.background) ?? "#fff"}${bgImg ? ` url('${bgImg}') center/cover` : ""};color:${safeColor(p.textColor) ?? "#1a1a1a"};font-family:'${font}',system-ui,sans-serif;font-size:14px;line-height:1.5}
 .lx-page *{box-sizing:border-box}
+.lx-page{position:relative}
+.lx-wm{position:absolute;inset:0;pointer-events:none;background-repeat:no-repeat space;background-position:center 60px;z-index:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.lx-page>.lx-block{position:relative;z-index:1}
 .lx-page h1,.lx-page h2,.lx-page h3{font-family:'${heading}',serif;margin:0;font-weight:500;line-height:1.2}
 .lx-page h1{font-size:28px}.lx-page h2{font-size:22px}.lx-page h3{font-size:17px}
 .lx-page p{margin:0}
@@ -297,10 +300,13 @@ export function templateCss(t: Template): string {
 
 /** Render the body fragment (`<div class="lx-page">…</div>`) for a template + context. */
 export function renderTemplate(t: Template, ctx: Ctx, opts: RenderOptions = {}): string {
-  return `<div class="lx-page">${t.blocks.map((b) => renderBlock(b, ctx, opts)).join("")}</div>`;
+  const wm = t.page.watermark;
+  const src = wm ? safeUrl(interpolate(wm.src, ctx)) : undefined;
+  const mark = wm && src ? `<div class="lx-wm" aria-hidden="true" style="background-image:url('${src}');background-size:${wm.size}% auto;opacity:${wm.opacity}"></div>` : "";
+  return `<div class="lx-page">${mark}${t.blocks.map((b) => renderBlock(b, ctx, opts)).join("")}</div>`;
 }
 
-const GOOGLE_FONTS = new Set(["Inter", "Cormorant Garamond", "Playfair Display", "Lora", "Montserrat", "Poppins", "Marcellus", "Cinzel", "DM Serif Display", "Noto Sans", "Noto Serif Devanagari"]);
+const GOOGLE_FONTS = new Set(["Inter", "Cormorant Garamond", "Playfair Display", "Lora", "Montserrat", "Poppins", "Marcellus", "Cinzel", "DM Serif Display", "Noto Sans", "Noto Serif Devanagari", "Red Hat Display", "Nunito", "Figtree"]);
 
 /** A complete standalone HTML document (used by the bill page and the PDF renderer). */
 export function renderDocument(t: Template, ctx: Ctx, opts: RenderOptions & { title?: string; head?: string; bodyEnd?: string } = {}): string {

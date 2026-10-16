@@ -45,7 +45,7 @@ export async function contextFor(db: Db, brandId: string, bill: Bill, links: Lin
   const brand = await db.query.brands.findFirst({ where: eq(brands.id, brandId) });
   const store = await db.query.stores.findFirst({ where: and(eq(stores.brandId, brandId), eq(stores.code, bill.store_code)) });
   return buildContext(bill, {
-    brand: { name: brand?.name ?? "", logo_url: brand?.logoUrl ?? undefined, website: brand?.website ?? undefined, support_phone: brand?.supportPhone ?? undefined },
+    brand: { name: brand?.name ?? "", logo_url: brand?.logoUrl ?? undefined, watermark_url: watermarkOf(brand?.settings), website: brand?.website ?? undefined, support_phone: brand?.supportPhone ?? undefined },
     store: {
       code: bill.store_code,
       name: store?.name ?? bill.store_code,
@@ -84,3 +84,9 @@ export async function renderHtml(template: Template, ctx: Record<string, unknown
 }
 
 export type { Survey };
+
+/** The brand kit's watermark, when it is switched on. */
+function watermarkOf(settings: unknown): string | undefined {
+  const kit = (settings as { brandKit?: { watermark?: boolean; mark?: string; logo?: string } } | null)?.brandKit;
+  return kit?.watermark ? (kit.mark ?? kit.logo) : undefined;
+}

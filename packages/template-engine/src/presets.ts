@@ -2,7 +2,7 @@ import { TemplateSchema, type Template, type TemplateInput } from "./schema.js";
 
 const luxe: TemplateInput = {
   name: "Luxe Gold",
-  page: { format: "mobile", background: "#fbf8f2", textColor: "#2a2118", mutedColor: "#8a7a66", accentColor: "#b08d57", fontFamily: "Inter", headingFontFamily: "Cormorant Garamond", padding: 24 },
+  page: { format: "mobile", background: "#fbf8f2", textColor: "#2a2118", mutedColor: "#8a7a66", accentColor: "#b08d57", fontFamily: "Inter", headingFontFamily: "Cormorant Garamond", padding: 24, watermark: { src: "{{brand.watermark_url}}", opacity: 0.05, size: 55 } },
   blocks: [
     { id: "logo", type: "image", props: { src: "{{brand.logo_url}}", alt: "{{brand.name}}", width: 40 }, style: { align: "center" }, visibleIf: { field: "brand.logo_url", op: "exists" } },
     { id: "brand", type: "heading", props: { text: "{{brand.name}}", level: 1 }, style: { align: "center", letterSpacing: 2 } },
@@ -66,7 +66,7 @@ const luxe: TemplateInput = {
 
 const classic: TemplateInput = {
   name: "Classic",
-  page: { format: "mobile", background: "#ffffff", textColor: "#111111", mutedColor: "#666666", accentColor: "#111111", fontFamily: "Inter", headingFontFamily: "Inter", padding: 20 },
+  page: { format: "mobile", background: "#ffffff", textColor: "#111111", mutedColor: "#666666", accentColor: "#111111", fontFamily: "Inter", headingFontFamily: "Inter", padding: 20, watermark: { src: "{{brand.watermark_url}}", opacity: 0.04, size: 50 } },
   blocks: [
     { id: "brand", type: "heading", props: { text: "{{brand.name}}", level: 2 }, style: { align: "center" } },
     { id: "store", type: "text", props: { text: "{{store.name}}\n{{store.address}}" }, style: { align: "center", fontSize: 12 } },

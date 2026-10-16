@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { api, dt, inr } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
@@ -33,6 +33,14 @@ export default function Bills() {
   const [query, setQuery] = useState("");
   const { data, error, reload } = useApi<{ bills: Row[]; total?: number }>(`/v1/bills?limit=100${query ? `&q=${encodeURIComponent(query)}` : ""}`);
   const [open, setOpen] = useState<Detail | null>(null);
+  // Opened from the dashboard with ?q=STORE: start with that search.
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("q");
+    if (v) {
+      setQ(v);
+      setQuery(v);
+    }
+  }, []);
   return (
     <Shell>
       <div className="head">

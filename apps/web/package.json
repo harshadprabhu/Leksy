@@ -15,19 +15,21 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@leksy/bill-schema": "workspace:*",
+    "@leksy/insights": "workspace:*",
     "@leksy/mapper": "workspace:*",
+    "@leksy/survey": "workspace:*",
     "@leksy/template-engine": "workspace:*",
     "next": "15.5.28",
+    "pptxgenjs": "3.12.0",
+    "qrcode": "^1.5.4",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "@leksy/survey": "workspace:*",
-    "qrcode": "^1.5.4",
-    "@leksy/insights": "workspace:*",
-    "pptxgenjs": "3.12.0"
+    "recharts": "2.15.4",
+    "zod": "4.1.0"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0",
-    "@types/qrcode": "^1.5.5"
+    "@types/react-dom": "^19.1.0"
   }
 }

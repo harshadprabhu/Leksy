@@ -8,7 +8,8 @@
 import { BillSchema, validateBill, type Bill } from "@leksy/bill-schema";
 import { applyMapping, samplePaths, suggestMapping, type Mapping } from "@leksy/mapper";
 import { cleanAnswers, MISSION_HAPPINESS, SurveySchema, type Survey } from "@leksy/survey";
-import { buildDemoDataset, buildNetwork, staffFor, storeProfile, themesFor, THEMES, type Dataset, type SampleBill } from "@leksy/insights";
+import { buildDemoDataset, buildNetwork, regionOf, tierOf, staffFor, storeProfile, themesFor, THEMES, type Dataset, type SampleBill } from "@leksy/insights";
+import { deckFromKit, loadPack, type BrandPack } from "./brandpack";
 import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type Condition, type Template } from "@leksy/template-engine";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -109,6 +110,10 @@ const CATALOG = [
 ];
 const HUID = () => Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]).join("");
 
+// Set by seed() from the brand pack when one is imported.
+let brandName = "Aurum & Co.";
+let invoicePrefix = "AUR";
+
 function makeBill(rand: () => number, at: Date, storeCode: string, n: number): Bill {
   const count = rand() < 0.65 ? 1 : 2;
   const items = Array.from({ length: count }, () => {
@@ -131,7 +136,7 @@ function makeBill(rand: () => number, at: Date, storeCode: string, n: number): B
           : p.cert === "GIA"
             ? { type: "GIA", number: `${Math.floor(rand() * 1e10)}`, issuer: "Gemological Institute of America", url: "https://www.gia.edu/report-check-landing" }
             : p.cert === "WARRANTY"
-              ? { type: "WARRANTY", number: `W-${Math.floor(rand() * 1e6)}`, issuer: "Aurum & Co." }
+              ? { type: "WARRANTY", number: `W-${Math.floor(rand() * 1e6)}`, issuer: brandName }
               : { type: "BIS_HALLMARK", number: huid, issuer: "Bureau of Indian Standards" },
       ],
     };
@@ -144,7 +149,7 @@ function makeBill(rand: () => number, at: Date, storeCode: string, n: number): B
   const staff = team[Math.floor(rand() * team.length)]!;
   const ist = new Date(at.getTime() + 5.5 * 3600e3).toISOString().slice(0, 19);
   return BillSchema.parse({
-    invoice_no: `AUR-${storeCode.slice(0, 3)}-${at.getUTCFullYear()}-${String(n).padStart(5, "0")}`,
+    invoice_no: `${invoicePrefix}-${storeCode.slice(0, 3)}-${at.getUTCFullYear()}-${String(n).padStart(5, "0")}`,
     store_code: storeCode,
     issued_at: `${ist}+05:30`,
     customer: { name, phone: `+9198${String(Math.floor(rand() * 1e8)).padStart(8, "0")}` },
@@ -184,16 +189,52 @@ const PULL_SAMPLE = {
   Items: [{ ProductName: "Gold Coin 10g", Quantity: 1, Price: 52530 }],
 };
 
+/** Stores from a brand pack, with region and tier filled in where the pack leaves them out. */
+function packStores(p: BrandPack) {
+  return (p.stores ?? []).map((st, i) => {
+    const region = st.region ?? regionOf({ city: st.city }) ?? undefined;
+    const tier = st.tier ?? tierOf(st.city) ?? 2;
+    return {
+      code: st.code,
+      name: st.name,
+      city: st.city,
+      ...(region ? { region } : {}),
+      tier,
+      address: st.address ?? st.city,
+      managerName: `${["Priya", "Arjun", "Neha", "Kiran", "Sourav", "Meera", "Rahul", "Divya"][i % 8]} ${"NSKRDMPG"[(i * 3) % 8]}`,
+      managerPhone: `+9198${String(10000000 + i).slice(-8)}`,
+      gstin: `${({ North: "07", South: "29", East: "19", West: "27" } as Record<string, string>)[region ?? ""] ?? "27"}ABCDE1234F1Z${(i % 9) + 1}`,
+    };
+  });
+}
+
 function seed(): DemoState {
   const rand = rng(42);
   const now = Date.now();
+  const pack = loadPack();
+  brandName = pack?.brand.name ?? "Aurum & Co.";
+  invoicePrefix = pack?.brand.invoicePrefix ?? (pack ? pack.brand.name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() : "AUR");
+  const stores = pack?.stores?.length ? packStores(pack) : STORES;
+  const ver = (key: string, name: string, body: Template) => ({ id: `tpl-${key}`, key, name, draft: body, publishedVersion: 1, updatedAt: new Date(now - 5 * DAY).toISOString(), versions: [{ version: 1, body, createdAt: new Date(now - 5 * DAY).toISOString() }] });
+  const billKey = pack?.billTemplate ?? "luxe-gold";
   const state: DemoState = {
-    brand: { id: "brand-demo", name: "Aurum & Co.", slug: "aurum-demo", logoUrl: null, website: "https://example.com", supportPhone: "+91 80 4000 1234", googleReviewUrl: "https://www.google.com/maps", settings: {} },
-    stores: STORES.map((s) => ({ id: id(), managerEmail: null, ...s })),
-    templates: Object.entries(PRESETS).map(([key, body]) => ({ id: `tpl-${key}`, key, name: body.name, draft: body, publishedVersion: 1, updatedAt: new Date(now - 5 * DAY).toISOString(), versions: [{ version: 1, body, createdAt: new Date(now - 5 * DAY).toISOString() }] })),
+    brand: pack
+      ? {
+          id: "brand-demo",
+          name: pack.brand.name,
+          slug: "pilot",
+          logoUrl: pack.kit.logo ?? null,
+          website: pack.brand.website ?? null,
+          supportPhone: pack.brand.supportPhone ?? null,
+          googleReviewUrl: pack.brand.googleReviewUrl ?? "https://www.google.com/maps",
+          settings: { brandKit: pack.kit, deck: deckFromKit(pack.kit, pack.deck?.footer), ...(pack.pdfTemplate ? { pdfTemplate: pack.pdfTemplate } : {}), pack: true },
+        }
+      : { id: "brand-demo", name: "Aurum & Co.", slug: "aurum-demo", logoUrl: null, website: "https://example.com", supportPhone: "+91 80 4000 1234", googleReviewUrl: "https://www.google.com/maps", settings: {} },
+    stores: stores.map((s) => ({ id: id(), managerEmail: null, ...s })),
+    templates: [...(pack?.templates ?? []).map((t) => ver(t.key, t.name, t.body)), ...Object.entries(PRESETS).map(([key, body]) => ver(key, body.name, body))],
     triggers: [
-      { id: id(), name: "High-value jewellery: protect with OTP", event: "bill.created", conditions: [{ field: "total", op: "gt", value: 200000 }], actions: { templateKey: "luxe-gold", surveyKey: "mission-happiness", channels: ["whatsapp", "sms", "email"], otpLock: true }, priority: 10, enabled: true },
-      { id: id(), name: "Send every bill", event: "bill.created", conditions: [{ field: "customer.consent", op: "neq", value: false }], actions: { templateKey: "luxe-gold", surveyKey: "mission-happiness", channels: ["whatsapp", "sms", "email"] }, priority: 100, enabled: true },
+      { id: id(), name: "High-value jewellery: protect with OTP", event: "bill.created", conditions: [{ field: "total", op: "gt", value: 200000 }], actions: { templateKey: billKey, surveyKey: "mission-happiness", channels: ["whatsapp", "sms", "email"], otpLock: true }, priority: 10, enabled: true },
+      { id: id(), name: "Send every bill", event: "bill.created", conditions: [{ field: "customer.consent", op: "neq", value: false }], actions: { templateKey: billKey, surveyKey: "mission-happiness", channels: ["whatsapp", "sms", "email"] }, priority: 100, enabled: true },
     ],
     connectors: [
       { id: "conn-push", name: "Ginesys POS (push)", kind: "push", ingestKey: "demoPushKey0000000000001", mapping: null, sample: PUSH_SAMPLE, pull: null, intervalSeconds: null, enabled: true, lastRunAt: null, lastError: null, cursor: null },
@@ -214,7 +255,7 @@ function seed(): DemoState {
   for (let d = 29; d >= 0; d--) {
     const perDay = 16 + Math.floor(rand() * 9);
     for (let k = 0; k < perDay; k++) {
-      const st = STORES[Math.floor(rand() * STORES.length)]!;
+      const st = state.stores[Math.floor(rand() * state.stores.length)]!;
       const at = new Date(now - d * DAY - Math.floor(rand() * 9) * 3600e3);
       if (at.getTime() > now) continue;
       const bill = makeBill(rand, at, st.code, ++state.seq);
@@ -336,13 +377,21 @@ export function linksFor(t: string) {
 export function billContext(state: DemoState, bill: DemoBill) {
   const store = state.stores.find((s) => s.code === bill.storeCode);
   return buildContext(bill.data, {
-    brand: { name: state.brand.name, logo_url: state.brand.logoUrl ?? undefined, website: state.brand.website ?? undefined, support_phone: state.brand.supportPhone ?? undefined },
+    brand: { name: state.brand.name, logo_url: state.brand.logoUrl ?? undefined, watermark_url: state.brand.settings?.brandKit?.watermark ? (state.brand.settings.brandKit.mark ?? state.brand.settings.brandKit.logo) : undefined, website: state.brand.website ?? undefined, support_phone: state.brand.supportPhone ?? undefined },
     store: { code: bill.storeCode, name: store?.name ?? bill.storeCode, address: store?.address, city: store?.city, phone: store?.phone, gstin: store?.gstin },
     links: linksFor(bill.token),
   });
 }
 
 /** The template version a bill was sent with (falls back to the live one). */
+/** The live version of a template by key, or null. */
+export function liveTemplate(state: DemoState, key: string): Template | null {
+  const t = state.templates.find((x) => x.key === key);
+  if (!t) return null;
+  const live = t.versions.find((v) => v.version === t.publishedVersion) ?? t.versions.at(-1);
+  return live ? TemplateSchema.parse(live.body) : null;
+}
+
 export function billTemplate(state: DemoState, bill: DemoBill): Template {
   const t = state.templates.find((x) => x.key === bill.templateKey) ?? state.templates[0]!;
   const live = t.versions.find((v) => v.version === t.publishedVersion) ?? t.versions.at(-1)!;
@@ -495,7 +544,7 @@ let memo: { key: string; ds: Dataset } | null = null;
  */
 export function demoDataset(s: DemoState): Dataset {
   const asOf = istDate(new Date().toISOString());
-  const key = `${asOf}|${s.bills.length}|${s.feedback.length}|${s.stores.length}|${s.brand.name}`;
+  const key = `${asOf}|${s.bills.length}|${s.feedback.length}|${s.stores.length}|${s.stores[0]?.code}|${s.brand.name}`;
   if (memo?.key === key) return memo.ds;
   const ds = buildDemoDataset({
     brand: s.brand.name,

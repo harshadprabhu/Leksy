@@ -71,3 +71,26 @@ describe("rendering", () => {
     expect(paths).toContain("totals.tax");
   });
 });
+
+describe("watermark", () => {
+  const t = TemplateSchema.parse({ page: { watermark: { src: "{{brand.watermark_url}}", opacity: 0.08, size: 40 } }, blocks: [{ id: "h", type: "heading", props: { text: "{{brand.name}}" } }] });
+  it("draws the brand mark behind the content when the brand has one", () => {
+    const html = renderTemplate(t, { brand: { name: "B", watermark_url: "https://cdn.example.com/mark.png" } });
+    expect(html).toContain(`class="lx-wm"`);
+    expect(html).toContain("url('https://cdn.example.com/mark.png')");
+    expect(html).toContain("opacity:0.08");
+  });
+  it("draws nothing without a mark, and never an unsafe URL", () => {
+    expect(renderTemplate(t, { brand: { name: "B" } })).not.toContain("lx-wm");
+    expect(renderTemplate(t, { brand: { name: "B", watermark_url: "javascript:alert(1)" } })).not.toContain("lx-wm");
+  });
+});
+
+describe("amount in words", () => {
+  it("uses the Indian system", () => {
+    expect(interpolate("{{v | words}}", { v: 103000 })).toBe("Rupees One Lakh Three Thousand Only");
+    expect(interpolate("{{v | words}}", { v: 25412345.5 })).toBe("Rupees Two Crore Fifty Four Lakh Twelve Thousand Three Hundred Forty Five and Fifty Paise Only");
+    expect(interpolate("{{v | words}}", { v: 0 })).toBe("Rupees Zero Only");
+    expect(interpolate("{{v | words}}", { v: 999 })).toBe("Rupees Nine Hundred Ninety Nine Only");
+  });
+});
