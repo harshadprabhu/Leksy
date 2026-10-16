@@ -1,7 +1,7 @@
 "use client";
 import type { Bill } from "@leksy/bill-schema";
 import { SURVEY_CSS, SURVEY_JS, surveyHtml } from "@leksy/survey";
-import { renderDocument, type Template } from "@leksy/template-engine";
+import { CAROUSEL_JS, renderDocument, type Block, type Template } from "@leksy/template-engine";
 import QRCode from "qrcode";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -11,9 +11,9 @@ import { htmlToPdf, saveBlob, sharePdf } from "@/lib/pdf";
 
 /**
  * What the customer sees after tapping the WhatsApp link (demo build): the bill as
- * a phone page, a sticky bar to download the PDF or share it, and the happiness
- * survey. The production page is served by the API at /b/:token with the same
- * template, survey and share button.
+ * a phone page, a sticky bar to call the store, download the PDF or share it, and
+ * the happiness survey. The production page is served by the API at /b/:token with
+ * the same template, survey, banners and contact bar.
  */
 const BRIDGE = `<script>
 window.LX_SUBMIT=function(a){return new Promise(function(res){
@@ -21,7 +21,9 @@ window.LX_SUBMIT=function(a){return new Promise(function(res){
   addEventListener('message',on);parent.postMessage({lxFeedback:a},'*');});};
 document.addEventListener('click',function(e){var a=e.target.closest('a');if(!a)return;
   if(a.href.indexOf('print=1')>=0){e.preventDefault();parent.postMessage({lxDownload:1},'*');}
-  else if(a.href.indexOf('/verify/')>=0){e.preventDefault();parent.postMessage({lxOpen:a.href},'*');}},true);
+  else if(a.href.indexOf('/verify/')>=0){e.preventDefault();parent.postMessage({lxOpen:a.href},'*');}
+  else if(a.getAttribute('href').charAt(0)==='#'){var el=document.getElementById(a.getAttribute('href').slice(1));e.preventDefault();
+    if(el)parent.postMessage({lxScroll:el.getBoundingClientRect().top},'*');}},true);
 // The page grows with its content, so the phone scrolls it like any web page.
 function h(){parent.postMessage({lxHeight:document.documentElement.scrollHeight},'*');}
 addEventListener('load',h);new ResizeObserver(h).observe(document.documentElement);
@@ -49,6 +51,7 @@ function BillView() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<"download" | "share" | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const pdf = useRef<{ name: string; title: string; blob: Promise<Blob> } | null>(null);
 
@@ -76,13 +79,20 @@ function BillView() {
       const answered = hasFeedback(bill);
       const sv = surveyFor(bill);
       setLook({ bg: tpl.page.background, accent: tpl.page.accentColor, font: tpl.page.fontFamily });
-      // The phone page: the sticky bar below replaces the in-page download buttons.
+      // The phone page. The bill sits in a sandboxed frame, which cannot open the
+      // share sheet or keep a bar on screen, so Share and the contact bar move to the
+      // sticky bar below; the in-page Download and Certificates buttons stay.
+      const phoneBlocks: Block[] = tpl.blocks
+        .filter((b) => b.type !== "contact_bar")
+        .map((b) => (b.type === "download_buttons" ? { ...b, props: { ...b.props, formats: b.props.formats.filter((f) => f !== "share") } } : b))
+        .filter((b) => b.type !== "download_buttons" || b.props.formats.length > 0);
+      setPhone(tpl.blocks.some((b) => b.type === "contact_bar") ? (s.brand.supportPhone ?? null) : null);
       const page = await withQr((qr) =>
-        renderDocument({ ...tpl, blocks: tpl.blocks.filter((b) => b.type !== "download_buttons") }, ctx, {
+        renderDocument({ ...tpl, blocks: phoneBlocks }, ctx, {
           title,
           head: `<style>${SURVEY_CSS}html,body{overflow:hidden}</style>${BRIDGE}`,
           surveySlot: (st) => (sv ? surveyHtml(sv.body, st, answered) : ""),
-          bodyEnd: answered || !sv ? "" : `<script>${SURVEY_JS}</script>`,
+          bodyEnd: `<script>${CAROUSEL_JS}${answered || !sv ? "" : SURVEY_JS}</script>`,
           qr,
         }),
       );
@@ -92,7 +102,7 @@ function BillView() {
       // prepared in the background so Download and Share respond at once.
       const pdfKey = s.brand.settings?.pdfTemplate as string | undefined;
       const printTpl: Template = (pdfKey && liveTemplate(s, pdfKey)) || tpl;
-      const printable = await withQr((qr) => renderDocument({ ...printTpl, blocks: printTpl.blocks.filter((b) => b.type !== "survey" && b.type !== "download_buttons") }, ctx, { title, qr }));
+      const printable = await withQr((qr) => renderDocument({ ...printTpl, blocks: printTpl.blocks.filter((b) => !["survey", "download_buttons", "contact_bar"].includes(b.type)) }, ctx, { title, qr }));
       pdf.current = { name: `${invoice}.pdf`, title, blob: new Promise((r) => setTimeout(r, 600)).then(() => htmlToPdf(printable)) };
       if (wantsPdf) void download();
     })();
@@ -136,6 +146,7 @@ function BillView() {
       if (typeof e.data?.lxHeight === "number") setHeight(Math.ceil(e.data.lxHeight));
       if (e.data?.lxDownload) void download();
       if (typeof e.data?.lxOpen === "string") window.open(e.data.lxOpen, "_blank", "noopener");
+      if (typeof e.data?.lxScroll === "number" && frame.current) window.scrollTo({ top: frame.current.getBoundingClientRect().top + window.scrollY + e.data.lxScroll - 16, behavior: "smooth" });
     };
     window.addEventListener("message", on);
     return () => window.removeEventListener("message", on);
@@ -186,6 +197,14 @@ function BillView() {
       <iframe ref={frame} title="Your bill" scrolling="no" sandbox="allow-scripts allow-forms allow-popups allow-modals allow-popups-to-escape-sandbox" srcDoc={html} style={{ height }} />
       <div className="ebill-bar" role="toolbar" aria-label="Bill actions">
         {note && <div className="ebill-note">{note}</div>}
+        {phone && (
+          <a className="eb-call" href={`tel:${phone.replace(/[^\d+]/g, "")}`} aria-label={`Call ${phone}`}>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path d="M6.6 10.8a15.1 15.1 0 006.6 6.6l2.2-2.2a1 1 0 011-.25 11.4 11.4 0 003.6.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.6a1 1 0 01-.25 1z" fill="currentColor" />
+            </svg>
+            <span>Contact</span>
+          </a>
+        )}
         <button className="eb-primary" onClick={() => void download()} disabled={busy !== null}>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path d="M12 3v12m0 0l-5-5m5 5l5-5M5 21h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

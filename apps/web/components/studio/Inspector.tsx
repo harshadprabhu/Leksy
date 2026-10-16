@@ -216,14 +216,17 @@ function PropsEditor({ block, setProps }: { block: Block; setProps: (p: Record<s
     case "download_buttons":
       return (
         <div className="stack">
-          {(["pdf", "share", "json"] as const).map((f) => (
+          <F label="Download button label">
+            <input value={block.props.pdfLabel ?? ""} placeholder="Download PDF" onChange={(e) => setProps({ pdfLabel: e.target.value || undefined })} />
+          </F>
+          {(["pdf", "share", "certificates", "json"] as const).map((f) => (
             <label key={f} className="row small">
               <input
                 type="checkbox"
                 checked={block.props.formats.includes(f)}
                 onChange={(e) => setProps({ formats: e.target.checked ? [...block.props.formats, f] : block.props.formats.filter((x) => x !== f) })}
               />
-              {f === "pdf" ? "Download PDF" : f === "share" ? "Share (WhatsApp, Mail…)" : "Data (JSON)"}
+              {f === "pdf" ? "Download PDF" : f === "share" ? "Share (WhatsApp, Mail…)" : f === "certificates" ? "View certificates (when the bill has some)" : "Data (JSON)"}
             </label>
           ))}
         </div>
@@ -240,6 +243,17 @@ function PropsEditor({ block, setProps }: { block: Block; setProps: (p: Record<s
     case "social_links":
       return (
         <div className="stack">
+          <div className="row">
+            <F label="Title">
+              <BoundInput value={block.props.title ?? ""} onChange={(title) => setProps({ title: title || undefined })} />
+            </F>
+            <F label="Show as">
+              <select value={block.props.style} onChange={(e) => setProps({ style: e.target.value })}>
+                <option value="icons">Icons</option>
+                <option value="text">Text links</option>
+              </select>
+            </F>
+          </div>
           {block.props.links.map((l, i) => (
             <div key={i} className="kvrow">
               <input value={l.label} onChange={(e) => setProps({ links: block.props.links.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />
@@ -259,7 +273,7 @@ function PropsEditor({ block, setProps }: { block: Block; setProps: (p: Record<s
         <div className="row">
           <F label="Line">
             <select value={block.props.style} onChange={(e) => setProps({ style: e.target.value })}>
-              {["solid", "dashed", "dotted", "double"].map((s) => (
+              {["solid", "dashed", "dotted", "double", "ornament"].map((s) => (
                 <option key={s}>{s}</option>
               ))}
             </select>
@@ -267,6 +281,121 @@ function PropsEditor({ block, setProps }: { block: Block; setProps: (p: Record<s
           <F label="Thickness">
             <input type="number" min={0.5} max={8} step={0.5} value={block.props.thickness} onChange={(e) => setProps({ thickness: Number(e.target.value) })} />
           </F>
+        </div>
+      );
+    case "banner_carousel": {
+      const slides = block.props.slides;
+      const setSlide = (i: number, patch: Record<string, unknown>) => setProps({ slides: slides.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+      return (
+        <div className="stack">
+          <F label={`Autoplay ${block.props.autoplay ? `${block.props.autoplay}s` : "off"}`}>
+            <input type="range" min={0} max={15} value={block.props.autoplay} onChange={(e) => setProps({ autoplay: Number(e.target.value) })} />
+          </F>
+          {slides.map((sl, i) => (
+            <div key={i} className="sect stack">
+              <div className="spread small">
+                <b>Banner {i + 1}</b>
+                <button className="btn sm" disabled={slides.length < 2} onClick={() => setProps({ slides: slides.filter((_, j) => j !== i) })}>
+                  Remove
+                </button>
+              </div>
+              <F label="Image (optional — replaces the designed banner)">
+                <BoundInput value={sl.image ?? ""} onChange={(image) => setSlide(i, { image: image || undefined })} />
+              </F>
+              <F label="Small line">
+                <BoundInput value={sl.kicker ?? ""} onChange={(kicker) => setSlide(i, { kicker: kicker || undefined })} />
+              </F>
+              <F label="Title">
+                <BoundInput value={sl.title} onChange={(title) => setSlide(i, { title })} />
+              </F>
+              <F label="Subtitle">
+                <BoundInput value={sl.subtitle ?? ""} onChange={(subtitle) => setSlide(i, { subtitle: subtitle || undefined })} />
+              </F>
+              <div className="row">
+                <F label="Button">
+                  <BoundInput value={sl.cta ?? ""} onChange={(cta) => setSlide(i, { cta: cta || undefined })} />
+                </F>
+                <F label="Link">
+                  <BoundInput value={sl.href ?? ""} onChange={(href) => setSlide(i, { href: href || undefined })} />
+                </F>
+              </div>
+              <div className="row">
+                <F label="Colour">
+                  <ColorInput value={sl.background} onChange={(background) => setSlide(i, { background })} />
+                </F>
+                <F label="Fade to">
+                  <ColorInput value={sl.background2} onChange={(background2) => setSlide(i, { background2 })} />
+                </F>
+                <F label="Text">
+                  <ColorInput value={sl.color} onChange={(color) => setSlide(i, { color })} />
+                </F>
+                <F label="Art">
+                  <select value={sl.art} onChange={(e) => setSlide(i, { art: e.target.value })}>
+                    {["diamond", "ring", "gift", "star", "coin", "none"].map((a) => (
+                      <option key={a}>{a}</option>
+                    ))}
+                  </select>
+                </F>
+              </div>
+            </div>
+          ))}
+          <button className="btn sm" disabled={slides.length >= 8} onClick={() => setProps({ slides: [...slides, { title: "New offer", art: "star" }] })}>
+            + Add banner
+          </button>
+        </div>
+      );
+    }
+    case "video_card":
+      return (
+        <div className="stack">
+          <F label="Title">
+            <BoundInput value={block.props.title} onChange={(title) => setProps({ title })} />
+          </F>
+          <F label="Subtitle">
+            <BoundInput value={block.props.subtitle ?? ""} onChange={(subtitle) => setProps({ subtitle: subtitle || undefined })} />
+          </F>
+          <F label="Video or channel link">
+            <BoundInput value={block.props.href} onChange={(href) => setProps({ href })} />
+          </F>
+          <F label="Thumbnail image (optional)">
+            <BoundInput value={block.props.thumbnail ?? ""} onChange={(thumbnail) => setProps({ thumbnail: thumbnail || undefined })} />
+          </F>
+        </div>
+      );
+    case "accordion":
+      return (
+        <div className="stack">
+          {block.props.items.map((it, i) => (
+            <div key={i} className="sect stack">
+              <div className="spread">
+                <input value={it.title} onChange={(e) => setProps({ items: block.props.items.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)) })} />
+                <button className="btn sm" disabled={block.props.items.length < 2} onClick={() => setProps({ items: block.props.items.filter((_, j) => j !== i) })}>
+                  ×
+                </button>
+              </div>
+              <textarea rows={4} value={it.body} onChange={(e) => setProps({ items: block.props.items.map((x, j) => (j === i ? { ...x, body: e.target.value } : x)) })} />
+            </div>
+          ))}
+          <button className="btn sm" disabled={block.props.items.length >= 12} onClick={() => setProps({ items: [...block.props.items, { title: "Section", body: "" }] })}>
+            + Add section
+          </button>
+        </div>
+      );
+    case "contact_bar":
+      return (
+        <div className="stack">
+          <F label="Phone">
+            <BoundInput value={block.props.phone} onChange={(phone) => setProps({ phone })} />
+          </F>
+          <div className="row">
+            <F label="Button">
+              <input value={block.props.label} onChange={(e) => setProps({ label: e.target.value })} />
+            </F>
+            <F label="Seal">
+              <input value={block.props.seal} onChange={(e) => setProps({ seal: e.target.value })} />
+            </F>
+          </div>
+          <div className="small muted">Stays at the bottom of the customer&apos;s phone screen.</div>
         </div>
       );
     case "spacer":
@@ -369,6 +498,9 @@ function StyleEditor({ style, setStyle }: { style: Style; setStyle: (s: Partial<
         </F>
       </div>
       <div className="row small">
+        <label className="row">
+          <input type="checkbox" checked={!!style.bleed} onChange={(e) => setStyle({ bleed: e.target.checked || undefined })} /> Edge to edge
+        </label>
         <label className="row">
           <input type="checkbox" checked={!!style.italic} onChange={(e) => setStyle({ italic: e.target.checked || undefined })} /> Italic
         </label>

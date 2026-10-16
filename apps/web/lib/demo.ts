@@ -16,7 +16,7 @@ import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const KEY = "lx_demo_v5"; // v5: ORRA Fine Jewellery (its 94 stores), bills with Share
+const KEY = "lx_demo_v6"; // v6: ORRA Fine Jewellery (its 94 stores), rich e-bill page with banners and socials
 const DAY = 864e5;
 
 interface DemoBill {
@@ -372,7 +372,7 @@ export function linksFor(t: string) {
 export function billContext(state: DemoState, bill: DemoBill) {
   const store = state.stores.find((s) => s.code === bill.storeCode);
   return buildContext(bill.data, {
-    brand: { name: state.brand.name, logo_url: state.brand.logoUrl ?? undefined, watermark_url: state.brand.settings?.brandKit?.watermark ? (state.brand.settings.brandKit.mark ?? state.brand.settings.brandKit.logo) : undefined, website: state.brand.website ?? undefined, support_phone: state.brand.supportPhone ?? undefined },
+    brand: { name: state.brand.name, logo_url: state.brand.logoUrl ?? undefined, logo_light_url: state.brand.settings?.brandKit?.logoLight ?? state.brand.logoUrl ?? undefined, watermark_url: state.brand.settings?.brandKit?.watermark ? (state.brand.settings.brandKit.mark ?? state.brand.settings.brandKit.logo) : undefined, website: state.brand.website ?? undefined, support_phone: state.brand.supportPhone ?? undefined },
     store: { code: bill.storeCode, name: store?.name ?? bill.storeCode, address: store?.address, city: store?.city, phone: store?.phone, gstin: store?.gstin },
     links: linksFor(bill.token),
   });

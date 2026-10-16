@@ -39,7 +39,39 @@ export const CATALOG: Entry[] = [
   { type: "download_buttons", label: "Download buttons", make: () => ({ id: uid(), type: "download_buttons", style: {}, props: { formats: ["pdf", "share"] } }) },
   { type: "qr", label: "QR code", make: () => ({ id: uid(), type: "qr", style: { align: "center" }, props: { value: "{{links.verify}}", size: 110, caption: "Scan to verify" } }) },
   { type: "button", label: "Button", make: () => ({ id: uid(), type: "button", style: { align: "center" }, props: { label: "Visit our website", href: "{{brand.website}}" } }) },
-  { type: "social_links", label: "Social links", make: () => ({ id: uid(), type: "social_links", style: { align: "center" }, props: { links: [{ label: "Instagram", href: "https://instagram.com/" }] } }) },
+  {
+    type: "social_links",
+    label: "Social icons",
+    make: () => ({
+      id: uid(),
+      type: "social_links",
+      style: { align: "center" },
+      props: { title: "Show us your love", style: "icons", links: [{ label: "Instagram", href: "https://instagram.com/" }, { label: "Facebook", href: "https://facebook.com/" }, { label: "YouTube", href: "https://youtube.com/" }] },
+    }),
+  },
+  {
+    type: "banner_carousel",
+    label: "Promotion banners",
+    make: () => ({
+      id: uid(),
+      type: "banner_carousel",
+      style: { bleed: true },
+      props: {
+        autoplay: 4,
+        slides: [
+          { kicker: "Festive edit", title: "New arrivals in store", subtitle: "Handcrafted for the season", cta: "Explore", href: "{{brand.website}}", art: "diamond" },
+          { kicker: "Refer & earn", title: "Share the joy", subtitle: "Gift vouchers for you and a friend", cta: "Refer now", href: "{{brand.website}}", art: "gift" },
+        ],
+      },
+    }),
+  },
+  { type: "video_card", label: "Video", make: () => ({ id: uid(), type: "video_card", style: {}, props: { title: "Watch our story", subtitle: "On YouTube", href: "https://youtube.com/" } }) },
+  {
+    type: "accordion",
+    label: "Terms & FAQs",
+    make: () => ({ id: uid(), type: "accordion", style: {}, props: { items: [{ title: "Terms & Conditions", body: "Goods once sold are subject to the store's exchange policy." }] } }),
+  },
+  { type: "contact_bar", label: "Contact bar", make: () => ({ id: uid(), type: "contact_bar", style: {}, props: { phone: "{{brand.support_phone}}", label: "Contact us", seal: "Secured by Leksy" } }) },
   { type: "divider", label: "Divider", make: () => ({ id: uid(), type: "divider", style: {}, props: { thickness: 1, style: "solid" } }) },
   { type: "spacer", label: "Spacer", make: () => ({ id: uid(), type: "spacer", style: {}, props: { height: 16 } }) },
   { type: "columns", label: "Two columns", make: () => ({ id: uid(), type: "columns", style: {}, props: { gap: 16, columns: [[], []] } }) },

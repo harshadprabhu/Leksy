@@ -22,6 +22,8 @@ export const StyleSchema = z
     marginTop: z.number().min(0).max(200).optional(),
     radius: z.number().min(0).max(48).optional(),
     border: z.string().max(32).optional(),
+    /** Run edge to edge across the page (e.g. a coloured thank-you band). */
+    bleed: z.boolean().optional(),
   })
   .partial();
 
@@ -59,7 +61,7 @@ const leaf = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("heading"), props: z.object({ text: z.string().max(500), level: z.number().int().min(1).max(3).default(1) }) }),
   z.object({ ...base, type: z.literal("text"), props: z.object({ text: z.string().max(5000) }) }),
   z.object({ ...base, type: z.literal("image"), props: z.object({ src: z.string().max(2000), alt: z.string().max(200).default(""), width: z.number().min(10).max(100).default(100) }) }),
-  z.object({ ...base, type: z.literal("divider"), props: z.object({ thickness: z.number().min(0.5).max(8).default(1), style: z.enum(["solid", "dashed", "dotted", "double"]).default("solid") }) }),
+  z.object({ ...base, type: z.literal("divider"), props: z.object({ thickness: z.number().min(0.5).max(8).default(1), style: z.enum(["solid", "dashed", "dotted", "double", "ornament"]).default("solid") }) }),
   z.object({ ...base, type: z.literal("spacer"), props: z.object({ height: z.number().min(0).max(400).default(16) }) }),
   z.object({ ...base, type: z.literal("items_table"), props: z.object({ source: z.string().max(200).default("items"), columns: z.array(TableColumnSchema).min(1).max(10), showHeader: z.boolean().default(true), detailLine: z.string().max(500).optional() }) }),
   z.object({ ...base, type: z.literal("item_cards"), props: z.object({ source: z.string().max(200).default("items"), title: z.string().max(300).default("{{name}}"), subtitle: z.string().max(500).optional(), price: z.string().max(300).default("{{amount | inr}}"), details: z.array(KvRowSchema).max(20).default([]), showImage: z.boolean().default(true) }) }),
@@ -68,9 +70,39 @@ const leaf = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("certificates"), props: z.object({ title: z.string().max(120).default("Certificates") }) }),
   z.object({ ...base, type: z.literal("qr"), props: z.object({ value: z.string().max(2000).default("{{links.verify}}"), size: z.number().min(48).max(400).default(120), caption: z.string().max(200).optional() }) }),
   z.object({ ...base, type: z.literal("button"), props: z.object({ label: z.string().max(80), href: z.string().max(2000) }) }),
-  z.object({ ...base, type: z.literal("download_buttons"), props: z.object({ formats: z.array(z.enum(["pdf", "share", "image", "json"])).default(["pdf", "share"]) }) }),
+  z.object({ ...base, type: z.literal("download_buttons"), props: z.object({ formats: z.array(z.enum(["pdf", "share", "certificates", "image", "json"])).default(["pdf", "share"]), pdfLabel: z.string().max(40).optional() }) }),
   z.object({ ...base, type: z.literal("survey"), props: z.object({ title: z.string().max(200).default("How was your visit?") }) }),
-  z.object({ ...base, type: z.literal("social_links"), props: z.object({ links: z.array(z.object({ label: z.string().max(40), href: z.string().max(500) })).max(10) }) }),
+  z.object({ ...base, type: z.literal("social_links"), props: z.object({ title: z.string().max(120).optional(), style: z.enum(["icons", "text"]).default("icons"), links: z.array(z.object({ label: z.string().max(40), href: z.string().max(500) })).max(10) }) }),
+  /** Swipeable promotions: campaign images, or designed slides from text and colours. */
+  z.object({
+    ...base,
+    type: z.literal("banner_carousel"),
+    props: z.object({
+      autoplay: z.number().min(0).max(15).default(4),
+      slides: z
+        .array(
+          z.object({
+            image: z.string().max(2000).optional(),
+            kicker: z.string().max(60).optional(),
+            title: z.string().max(120).default(""),
+            subtitle: z.string().max(240).optional(),
+            cta: z.string().max(40).optional(),
+            href: z.string().max(2000).optional(),
+            background: z.string().max(32).optional(),
+            background2: z.string().max(32).optional(),
+            color: z.string().max(32).optional(),
+            accent: z.string().max(32).optional(),
+            art: z.enum(["diamond", "ring", "gift", "star", "coin", "none"]).default("diamond"),
+          }),
+        )
+        .min(1)
+        .max(8),
+    }),
+  }),
+  z.object({ ...base, type: z.literal("video_card"), props: z.object({ title: z.string().max(120), subtitle: z.string().max(200).optional(), href: z.string().max(2000), thumbnail: z.string().max(2000).optional(), background: z.string().max(32).optional() }) }),
+  z.object({ ...base, type: z.literal("accordion"), props: z.object({ items: z.array(z.object({ title: z.string().max(120), body: z.string().max(4000) })).min(1).max(12) }) }),
+  /** Bar fixed to the bottom of the phone screen: call the store and the authenticity seal. */
+  z.object({ ...base, type: z.literal("contact_bar"), props: z.object({ phone: z.string().max(200).default("{{brand.support_phone}}"), label: z.string().max(40).default("Contact us"), seal: z.string().max(60).default("Secured by Leksy") }) }),
 ]);
 
 export type LeafBlock = z.infer<typeof leaf>;

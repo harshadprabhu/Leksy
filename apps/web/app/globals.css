@@ -393,6 +393,8 @@ pre.code { max-width: 100%; overflow: auto; }
 .ebill-bar button:disabled { opacity: .7; }
 .ebill-bar .eb-primary { background: var(--eb-accent); color: #fff; border: 0; }
 .ebill-bar .eb-secondary { background: transparent; color: var(--eb-accent); border: 1.5px solid var(--eb-accent); }
+.ebill-bar .eb-call { flex: 0 0 auto; min-height: 48px; padding: 0 16px; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 1.5px solid var(--eb-accent); color: var(--eb-accent); text-decoration: none; font-size: 15px; font-weight: 600; }
+@media (max-width: 400px) { .ebill-bar { gap: 8px; padding-left: 12px; padding-right: 12px; } .ebill-bar .eb-call span { display: none; } .ebill-bar .eb-call { padding: 0 14px; } }
 .ebill-note { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); background: #222; color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 999px; white-space: nowrap; box-shadow: 0 6px 20px rgba(0, 0, 0, .2); }
 
 /* ---------- Dashboard drill-down: always a way back ---------- */

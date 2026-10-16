@@ -1,6 +1,6 @@
 import type { Bill } from "@leksy/bill-schema";
 import { billLinks, contentHash, contextFor, emitWebhook, FeedbackError, randomToken, renderHtml, resolveSurvey, resolveTemplate, safeEqual, sendAlert, sha256, submitFeedback, templateByVersionId } from "@leksy/core";
-import { SHARE_JS } from "@leksy/template-engine";
+import { CAROUSEL_JS, SHARE_JS } from "@leksy/template-engine";
 import { bills, brands, events, feedback } from "@leksy/core/db";
 import { eq, sql } from "drizzle-orm";
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
@@ -54,7 +54,7 @@ export const publicRoutes = (d: Deps): FastifyPluginAsync => async (app) => {
       title: `${brand?.name ?? "Your"} bill ${data.invoice_no}`,
       head: `<style>${SURVEY_CSS}</style>`,
       surveyHtml: s ? (title) => surveyHtml(s.survey, title, answered) : () => "",
-      bodyEnd: `<script nonce="${nonce}">${SHARE_JS}${s && !answered ? SURVEY_JS : ""}</script>`,
+      bodyEnd: `<script nonce="${nonce}">${SHARE_JS}${CAROUSEL_JS}${s && !answered ? SURVEY_JS : ""}</script>`,
     });
     // Count opens (first open drives the "opened" metric).
     await d.db.update(bills).set({ openCount: sql`${bills.openCount} + 1`, openedAt: sql`coalesce(${bills.openedAt}, now())` }).where(eq(bills.id, bill.id));

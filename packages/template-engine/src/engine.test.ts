@@ -107,3 +107,45 @@ describe("download and share buttons", () => {
     expect(css).toMatch(/\.lx-wm\{[^}]*background-repeat:no-repeat;/);
   });
 });
+
+describe("rich landing blocks", () => {
+  const t = TemplateSchema.parse({
+    blocks: [
+      { id: "car", type: "banner_carousel", props: { slides: [{ kicker: "Festive", title: "Hello {{customer.name}}", href: "https://brand.example.com/offer", art: "diamond" }, { title: "Bad", href: "javascript:alert(1)", background: "red;x:y" }, { title: "Picture", image: "https://cdn.example.com/b.jpg" }] } },
+      { id: "soc", type: "social_links", props: { title: "Show us your love", links: [{ label: "Instagram", href: "https://instagram.com/brand" }, { label: "YouTube", href: "https://www.youtube.com/@brand" }, { label: "X", href: "https://x.com/brand" }, { label: "Evil", href: "javascript:alert(1)" }] } },
+      { id: "vid", type: "video_card", props: { title: "Our story", href: "https://www.youtube.com/watch?v=abc" } },
+      { id: "acc", type: "accordion", props: { items: [{ title: "Terms", body: "<b>No</b> refunds" }] } },
+      { id: "bar", type: "contact_bar", props: {} },
+      { id: "dl", type: "download_buttons", props: { formats: ["pdf", "certificates"], pdfLabel: "Download invoice" } },
+    ],
+  });
+  const html = renderTemplate(t, ctx);
+  it("renders swipeable banners with safe links and colours", () => {
+    expect(html).toContain('data-autoplay="4"');
+    expect(html.match(/class="lx-slide( lx-slide-img)?"/g)).toHaveLength(3);
+    expect(html).toContain("Hello Ananya Rao");
+    expect(html).toContain('href="https://brand.example.com/offer"');
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain("red;x:y");
+    expect(html).toContain('<img src="https://cdn.example.com/b.jpg"');
+    expect(html.match(/<i( class="on")?><\/i>/g)).toHaveLength(3);
+  });
+  it("draws social icons per network and drops unsafe links", () => {
+    expect(html).toContain("Show us your love");
+    for (const n of ["instagram", "youtube", "x"]) expect(html).toContain(`lx-soc lx-soc-${n}`);
+    expect(html).not.toContain('aria-label="Evil"');
+  });
+  it("renders the video card, escaped terms and the contact bar", () => {
+    expect(html).toContain('class="lx-video" href="https://www.youtube.com/watch?v=abc"');
+    expect(html).toContain("<summary>Terms</summary>");
+    expect(html).toContain("&lt;b&gt;No&lt;/b&gt; refunds");
+    expect(html).toContain(`href="tel:${SAMPLE_BRAND.support_phone!.replace(/[^\d+]/g, "")}"`);
+    expect(html).toContain('href="https://leksy.in/v/abc"');
+  });
+  it("labels the invoice download and links to the certificates", () => {
+    expect(html).toContain("download>Download invoice");
+    expect(html).toContain('href="#lx-certificates">View certificates');
+    const none = renderTemplate(t, { ...ctx, items: [{ name: "Ring" }] });
+    expect(none).not.toContain("View certificates");
+  });
+});

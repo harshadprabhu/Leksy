@@ -33,7 +33,7 @@ function List(p: Props & { listKey: string; list: Block[]; sensors: ReturnType<t
       <SortableContext items={p.list.map((b) => b.id)} strategy={verticalListSortingStrategy}>
         <div className="stack" style={{ gap: 2, marginLeft: p.depth ? 14 : 0 }}>
           {p.list.map((b) => (
-            <Row key={b.id} block={b} {...p} />
+            <Row key={b.id} {...p} block={b} />
           ))}
           {p.depth > 0 && p.list.length === 0 && <div className="small muted" style={{ padding: "4px 8px" }}>Empty</div>}
         </div>

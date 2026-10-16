@@ -4,6 +4,8 @@ import type { Ctx } from "./expr.js";
 export interface BrandInfo {
   name: string;
   logo_url?: string;
+  /** Logo for dark bands (white or gold on charcoal); falls back to the logo. */
+  logo_light_url?: string;
   /** Faint mark used as the page watermark (defaults to nothing). */
   watermark_url?: string;
   website?: string;
