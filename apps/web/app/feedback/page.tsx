@@ -65,6 +65,11 @@ export default function Feedback() {
             {data?.feedback.map((f) => {
               const late = f.ticketStatus === "open" && f.slaDueAt && new Date(f.slaDueAt) < new Date();
               const issues = [...((f.answers.improve as string[]) ?? []), ...((f.answers.loved as string[]) ?? []).map((x) => `♥ ${x}`)];
+              // Answers to questions a brand added in the survey editor.
+              const SHOWN = new Set(["overall", "improve", "loved", "nps", "comment"]);
+              const extra = Object.entries(f.answers)
+                .filter(([k, v]) => !SHOWN.has(k) && v !== "" && v != null && !(typeof v === "string" && v === f.comment))
+                .map(([k, v]) => `${k.replace(/_/g, " ")}: ${Array.isArray(v) ? v.join(", ") : String(v)}`);
               return (
                 <tr key={f.id}>
                   <td className="muted">{dt(f.createdAt)}</td>
@@ -77,6 +82,7 @@ export default function Feedback() {
                   <td>
                     {issues.length > 0 && <div className="small">{issues.join(" · ")}</div>}
                     {f.comment && <div className="small muted">“{f.comment}”</div>}
+                    {extra.length > 0 && <div className="small muted">{extra.join(" · ")}</div>}
                   </td>
                   <td>
                     {f.ticketStatus === "none" ? (

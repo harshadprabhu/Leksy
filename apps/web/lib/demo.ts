@@ -7,7 +7,7 @@
  */
 import { BillSchema, validateBill, type Bill } from "@leksy/bill-schema";
 import { applyMapping, samplePaths, suggestMapping, type Mapping } from "@leksy/mapper";
-import { cleanAnswers, MISSION_HAPPINESS } from "@leksy/survey";
+import { cleanAnswers, MISSION_HAPPINESS, SurveySchema, type Survey } from "@leksy/survey";
 import { buildContext, checkCondition, listFields, PRESETS, TemplateSchema, type Condition, type Template } from "@leksy/template-engine";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -32,6 +32,17 @@ interface DemoBill {
   templateKey: string;
   templateVersion: number;
   otpLock: boolean;
+  surveyKey?: string | null;
+}
+
+interface DemoSurvey {
+  key: string;
+  name: string;
+  body: Survey;
+  alertThreshold: number;
+  reviewThreshold: number;
+  slaMinutes: number;
+  updatedAt: string;
 }
 
 interface DemoState {
@@ -46,8 +57,13 @@ interface DemoState {
   events: any[];
   apiKeys: any[];
   webhooks: any[];
+  surveys: DemoSurvey[];
   seq: number;
 }
+
+const defaultSurveys = (): DemoSurvey[] => [
+  { key: "mission-happiness", name: "Mission Happiness", body: MISSION_HAPPINESS, alertThreshold: 2, reviewThreshold: 4, slaMinutes: 240, updatedAt: new Date().toISOString() },
+];
 
 // ---------- deterministic sample data ----------
 
@@ -185,6 +201,7 @@ function seed(): DemoState {
     events: [],
     apiKeys: [{ id: id(), name: "Default", prefix: "demoKey123", requireSignature: false, lastUsedAt: new Date(now - 3600e3).toISOString(), createdAt: new Date(now - 30 * DAY).toISOString() }],
     webhooks: [],
+    surveys: defaultSurveys(),
     seq: 1000,
   };
   // ~120 bills over 30 days; Mumbai has slow billing, Delhi shines.
@@ -246,6 +263,7 @@ function addBill(state: DemoState, bill: Bill, source: string, at = new Date()):
     templateKey: tpl.key,
     templateVersion: tpl.publishedVersion ?? 1,
     otpLock: !!actions.otpLock,
+    surveyKey: bill.survey ?? actions.surveyKey ?? null,
   };
   state.bills.unshift(row);
   const channel = actions.channels[0] ?? "whatsapp";
@@ -254,8 +272,8 @@ function addBill(state: DemoState, bill: Bill, source: string, at = new Date()):
   return row;
 }
 
-function feedbackRow(state: DemoState, bill: DemoBill, rating: number, answers: Record<string, unknown>, at = new Date()) {
-  const alert = rating <= 2;
+function feedbackRow(state: DemoState, bill: DemoBill, rating: number, answers: Record<string, unknown>, at = new Date(), alertThreshold = 2, slaMinutes = 240) {
+  const alert = rating <= alertThreshold;
   const fb = {
     id: id(),
     billId: bill.id,
@@ -266,7 +284,7 @@ function feedbackRow(state: DemoState, bill: DemoBill, rating: number, answers: 
     answers,
     comment: (answers.comment as string) ?? null,
     ticketStatus: alert ? "open" : "none",
-    slaDueAt: alert ? new Date(at.getTime() + 240 * 60e3).toISOString() : null,
+    slaDueAt: alert ? new Date(at.getTime() + slaMinutes * 60e3).toISOString() : null,
     resolutionNote: null as string | null,
     createdAt: at.toISOString(),
   };
@@ -283,7 +301,11 @@ export function load(): DemoState {
   if (cache) return cache;
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return (cache = JSON.parse(raw) as DemoState);
+    if (raw) {
+      cache = JSON.parse(raw) as DemoState;
+      cache.surveys ??= defaultSurveys(); // data saved before surveys were editable
+      return cache;
+    }
   } catch {}
   cache = seed();
   save();
@@ -337,14 +359,28 @@ export function markOpened(bill: DemoBill) {
   }
 }
 
+/** The survey a bill asks (the one its trigger chose), or null for none. */
+export function surveyFor(bill: DemoBill): DemoSurvey | null {
+  const s = load();
+  const key = bill.surveyKey === undefined ? "mission-happiness" : bill.surveyKey;
+  return key ? (s.surveys.find((x) => x.key === key) ?? null) : null;
+}
+
 export function submitDemoFeedback(bill: DemoBill, raw: Record<string, unknown>): { ok: boolean; j: any } {
   const s = load();
   if (s.feedback.some((f) => f.billId === bill.id)) return { ok: false, j: { error: "feedback already submitted for this bill" } };
-  const { answers, errors } = cleanAnswers(MISSION_HAPPINESS, raw);
+  const sv = surveyFor(bill);
+  if (!sv) return { ok: false, j: { error: "no survey for this bill" } };
+  const { answers, errors } = cleanAnswers(sv.body, raw);
   if (errors.length) return { ok: false, j: { error: errors.join("; ") } };
-  const fb = feedbackRow(s, bill, Number(answers.overall), answers);
+  const rating = Number(answers[sv.body.primary]);
+  if (!Number.isInteger(rating)) return { ok: false, j: { error: "missing rating" } };
+  const npsQ = sv.body.questions.find((q) => q.type === "nps");
+  const textQ = sv.body.questions.find((q) => q.type === "text");
+  const normalised = { ...answers, ...(npsQ && answers[npsQ.id] !== undefined ? { nps: answers[npsQ.id] } : {}), ...(textQ && answers[textQ.id] ? { comment: answers[textQ.id] } : {}) };
+  const fb = feedbackRow(s, bill, rating, normalised, new Date(), sv.alertThreshold, sv.slaMinutes);
   save();
-  return { ok: true, j: { ok: true, reviewUrl: fb.rating >= 4 ? s.brand.googleReviewUrl : null, alert: fb.rating <= 2 } };
+  return { ok: true, j: { ok: true, reviewUrl: rating >= sv.reviewThreshold ? s.brand.googleReviewUrl : null, alert: rating <= sv.alertThreshold } };
 }
 
 export function hasFeedback(bill: DemoBill) {
@@ -617,7 +653,18 @@ function route(s: DemoState, method: string, seg: string[], q: URLSearchParams, 
     return { webhooks: s.webhooks };
   }
 
-  if (res === "surveys") return { surveys: [{ key: "mission-happiness", name: "Mission Happiness", body: MISSION_HAPPINESS }] };
+  if (res === "surveys") {
+    if (M === "PUT" && rid) {
+      const parsed = SurveySchema.safeParse(body.body);
+      if (!parsed.success) throw new DemoError(422, parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+      const row: DemoSurvey = { key: rid, name: body.name, body: parsed.data, alertThreshold: body.alertThreshold ?? 2, reviewThreshold: body.reviewThreshold ?? 4, slaMinutes: body.slaMinutes ?? 240, updatedAt: new Date().toISOString() };
+      const i = s.surveys.findIndex((x) => x.key === rid);
+      if (i >= 0) s.surveys[i] = row;
+      else s.surveys.push(row);
+      return row;
+    }
+    return { surveys: s.surveys };
+  }
   throw new DemoError(404, `demo: ${method} ${seg.join("/")} not supported`);
 }
 

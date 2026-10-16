@@ -1,12 +1,12 @@
 "use client";
 import type { Bill } from "@leksy/bill-schema";
-import { MISSION_HAPPINESS, SURVEY_CSS, SURVEY_JS, surveyHtml } from "@leksy/survey";
+import { SURVEY_CSS, SURVEY_JS, surveyHtml } from "@leksy/survey";
 import { renderDocument } from "@leksy/template-engine";
 import QRCode from "qrcode";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { DEMO } from "@/lib/api";
-import { billContext, billTemplate, findBillByToken, hasFeedback, load, markOpened, submitDemoFeedback } from "@/lib/demo";
+import { billContext, billTemplate, findBillByToken, hasFeedback, load, markOpened, submitDemoFeedback, surveyFor } from "@/lib/demo";
 
 /**
  * What the customer sees after tapping the WhatsApp link (demo build).
@@ -50,13 +50,14 @@ function BillView() {
       const tpl = billTemplate(s, bill);
       const ctx = billContext(s, bill);
       const answered = hasFeedback(bill);
+      const sv = surveyFor(bill);
       const qr: { value: string; size: number }[] = [];
       const blocks = printing ? tpl.blocks.filter((b) => b.type !== "survey" && b.type !== "download_buttons") : tpl.blocks;
       let doc = renderDocument({ ...tpl, blocks }, ctx, {
         title: `${s.brand.name} bill ${(bill.data as Bill).invoice_no}`,
         head: `<style>${SURVEY_CSS}</style>${BRIDGE}`,
-        surveySlot: (title) => surveyHtml(MISSION_HAPPINESS, title, answered),
-        bodyEnd: printing ? `<script>addEventListener('load',function(){setTimeout(function(){print()},700)})</script>` : answered ? "" : `<script>${SURVEY_JS}</script>`,
+        surveySlot: (title) => (sv ? surveyHtml(sv.body, title, answered) : ""),
+        bodyEnd: printing ? `<script>addEventListener('load',function(){setTimeout(function(){print()},700)})</script>` : answered || !sv ? "" : `<script>${SURVEY_JS}</script>`,
         qr: (value, size) => {
           qr.push({ value, size });
           return `<!--lx-qr-${qr.length - 1}-->`;

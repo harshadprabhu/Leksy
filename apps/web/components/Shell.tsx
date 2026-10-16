@@ -9,6 +9,7 @@ const NAV = [
   ["/", "Dashboard"],
   ["/bills", "Bills"],
   ["/feedback", "Mission Happiness"],
+  ["/surveys", "Survey editor"],
   ["/studio", "Template Studio"],
   ["/connectors", "Integrations"],
   ["/triggers", "Triggers"],

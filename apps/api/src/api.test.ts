@@ -139,6 +139,24 @@ describe.skipIf(!DB_URL)("Leksy API", () => {
     expect(verify.body).toContain("Genuine bill");
   });
 
+  it("uses a survey edited in the dashboard, with its own alert threshold", async () => {
+    const list = await app.inject({ method: "GET", url: "/v1/surveys", headers: { authorization: `Bearer ${jwt}` } });
+    const mh = list.json().surveys.find((x: { key: string }) => x.key === "mission-happiness");
+    const body = { ...mh.body, questions: [...mh.body.questions, { id: "occasion", type: "choice", label: "What was the occasion?", options: ["Wedding", "Gift"] }] };
+    const saved = await app.inject({ method: "PUT", url: "/v1/surveys/mission-happiness", headers: { authorization: `Bearer ${jwt}` }, payload: { name: "Mission Happiness", body, alertThreshold: 3, reviewThreshold: 5, slaMinutes: 60 } });
+    expect(saved.statusCode).toBe(200);
+
+    const created = await post("/v1/bills", bill("INV-SV"));
+    const token = created.json().url.split("/").pop();
+    const page = await app.inject({ method: "GET", url: `/b/${token}` });
+    expect(page.body).toContain("What was the occasion?");
+    const fb = await app.inject({ method: "POST", url: `/b/${token}/feedback`, payload: { answers: { overall: 3, occasion: "Wedding" } } });
+    expect(fb.statusCode).toBe(200);
+    const row = await db.query.feedback.findFirst({ where: eq(feedback.rating, 3) });
+    expect(row?.ticketStatus).toBe("open");
+    expect(row?.answers).toMatchObject({ occasion: "Wedding" });
+  });
+
   it("renders template previews for the studio", async () => {
     const presets = await app.inject({ method: "GET", url: "/v1/templates/presets", headers: { authorization: `Bearer ${jwt}` } });
     const template = presets.json().presets[0].template;

@@ -35,6 +35,7 @@ const BLANK: Trigger = { name: "", event: "bill.created", conditions: [], action
 export default function Triggers() {
   const { data, reload } = useApi<{ triggers: Trigger[] }>("/v1/triggers");
   const { data: tpls } = useApi<{ templates: { key: string; name: string }[] }>("/v1/templates");
+  const { data: surveys } = useApi<{ surveys: { key: string; name: string }[] }>("/v1/surveys");
   const [edit, setEdit] = useState<Trigger | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -173,8 +174,15 @@ export default function Triggers() {
               </select>
             </label>
             <label className="f">
-              Survey key (blank = none)
-              <input value={edit.actions.surveyKey ?? ""} onChange={(e) => setEdit({ ...edit, actions: { ...edit.actions, surveyKey: e.target.value || undefined } })} />
+              Survey on the bill
+              <select value={edit.actions.surveyKey ?? ""} onChange={(e) => setEdit({ ...edit, actions: { ...edit.actions, surveyKey: e.target.value || undefined } })}>
+                <option value="">No survey</option>
+                {surveys?.surveys.map((sv) => (
+                  <option key={sv.key} value={sv.key}>
+                    {sv.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <div className="stack" style={{ gap: 4 }}>
               <span className="small muted">Channels, tried in this order until one works</span>
